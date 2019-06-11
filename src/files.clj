@@ -1,4 +1,5 @@
-(ns upload
+(ns files
+  (:gen-class)
   (:require [compojure.core :refer [defroutes GET POST]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
@@ -112,7 +113,7 @@
   (let [port 8080]
     (stop)
     (reset! http-server (jetty/run-jetty app {:port port :join? false}))
-    (clojure.java.browse/browse-url (str "http://localhost:" port))))
+    (println "Server running at" (str "http://localhost:" port))))
 
 (defn restart []
   (stop)
