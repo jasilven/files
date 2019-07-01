@@ -2,6 +2,7 @@
   :description "files"
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [ring "1.7.0"]
+                 [org.clojure/core.async "0.4.500"]
                  [org.postgresql/postgresql "42.2.5"]
                  [org.clojure/java.jdbc "0.7.9"]
                  [compojure "1.6.1"]
