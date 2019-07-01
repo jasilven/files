@@ -44,7 +44,7 @@
   "return file info as json response"
   [db id]
   (try
-    (let [result (first (db/get-file db id))]
+    (let [result (db/get-file db id)]
       (json-ok (dissoc result :file_data)))
     (catch Exception e (json-error (.getMessage e)))))
 
@@ -52,7 +52,7 @@
   "return file response with files mime type set to content-type"
   [db id]
   (try
-    (let [result (first (db/get-file db id))]
+    (let [result (db/get-file db id)]
       {:status 200
        :headers {"Content-type" (:mime_type result)}
        :body (io/input-stream (:file_data result))})
@@ -70,7 +70,7 @@
       (json-error (str "file missing or empty file"))
       (try
         (let [result (db/create-file db file-name content-type file-data)]
-          (json-ok (map #(dissoc % :file_data) result)))
+          (json-ok (dissoc result :file_data)))
         (catch Exception e (json-error (.getMessage e)))))))
 
 (defn delete-file

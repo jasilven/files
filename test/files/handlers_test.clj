@@ -28,7 +28,7 @@
 (t/deftest create-file
   (t/testing "create-file"
     (let [response (h/create-file test-db test-params)
-          body (first (json/read-str (:body response) :key-fn keyword))]
+          body (json/read-str (:body response) :key-fn keyword)]
       (t/is (= 200 (:status response)))
       (t/is (= {"Content-Type" "application/json"} (:headers response)))
       (t/is (= false (empty? (:id body))))
@@ -39,7 +39,7 @@
 (t/deftest create-and-get-file
   (t/testing "create and then get single file with data"
     (let [create-resp (h/create-file test-db test-params)
-          create-body (first (json/read-str (:body create-resp) :key-fn keyword))
+          create-body (json/read-str (:body create-resp) :key-fn keyword)
           id (:id create-body)
           get-resp (h/get-file test-db id)]
       (t/is (= 200 (:status create-resp)))
@@ -62,7 +62,7 @@
   (t/testing "create and then get file info as json"
     (let [create-resp (h/create-file test-db test-params)
           body (json/read-str (:body create-resp) :key-fn keyword)
-          id (:id (first body))
+          id (:id body)
           info-resp (h/get-file-info test-db id)
           info-body (json/read-str (:body info-resp) :key-fn keyword)]
       (t/is (= 200 (:status create-resp)))
@@ -75,7 +75,7 @@
 (t/deftest create-and-delete
   (t/testing "create and then delete single file"
     (let [create-resp (h/create-file test-db test-params)
-          body (first (json/read-str (:body create-resp) :key-fn keyword))
+          body (json/read-str (:body create-resp) :key-fn keyword)
           id (:id body)
           delete-resp1 (h/delete-file test-db id)
           delete-resp2 (h/delete-file test-db id)]
