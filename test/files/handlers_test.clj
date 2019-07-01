@@ -82,5 +82,5 @@
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status delete-resp1)))
       (t/is (= 200 (:status delete-resp2)))
-      (t/is (= "\"1\"" (:body delete-resp1))) ;; number of rows deleted
-      (t/is (= "\"0\"" (:body delete-resp2)))))) ;; number of rows deleted after first delete
+      (t/is (= "{\"result\":1}" (:body delete-resp1))) ;; number of rows deleted first time
+      (t/is (= "{\"result\":0}" (:body delete-resp2)))))) ;; number of rows deleted after first delete

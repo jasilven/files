@@ -25,7 +25,7 @@
        (catch Exception e false)))
 
 (defn create-files-table
-  "create files table and return true. Throws if error."
+  "create files table. Throws if error."
   [db]
   (let [sql-command (sql/create-table-ddl :files table-ddl)]
     (sql/db-do-commands db [sql-command])))
@@ -37,7 +37,7 @@
     (sql/db-do-commands db [sql-command])))
 
 (defn create-file
-  "inserts file in db and return map of created file. Throws if error."
+  "inserts file and return map of created file. Throws if error."
   [db file-name mime-type file-data]
   (first (sql/insert! db :files {:id (uuid)
                                  :created (timestamp)
@@ -45,21 +45,21 @@
                                  :mime_type mime-type
                                  :file_data file-data})))
 (defn delete-file
-  "deletes file in db. Throws if error."
+  "delete file. Throws if error."
   [db id]
   (if (valid-id? id)
     (sql/execute! db ["DELETE FROM files WHERE id = ?" id])
     (throw (Exception. "invalid file id"))))
 
 (defn get-files
-  "returns list of files in db up to limit. Throws if error."
+  "returns list of files up to limit. Throws if error."
   [db limit]
   (if (pos-int? limit)
     (sql/query db ["SELECT * FROM files ORDER BY created DESC LIMIT ?" limit])
     (throw (Exception. "invalid parameter limit"))))
 
 (defn get-file
-  "return file as map from db or nil if not found. Throws if error."
+  "return file as map or nil if not found. Throws if error."
   [db id]
   (if (valid-id? id)
     (let [result (sql/query db ["SELECT * FROM files WHERE id = ?" id])]
@@ -67,10 +67,3 @@
           (first result)))
     (throw (Exception. "invalid file id"))))
 
-(comment
-  (db-connection? (clojure.edn/read-string (slurp "resources/db.edn")))
-  (get-file (clojure.edn/read-string (slurp "resources/db.edn")) "moi" )
-  (create-files-table (clojure.edn/read-string (slurp "resources/db.edn")))
-  (drop-files-table (clojure.edn/read-string (slurp "resources/db.edn")))
-  (get-files (clojure.edn/read-string (slurp "resources/db.edn")) 10 )
-  )

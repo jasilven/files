@@ -49,7 +49,7 @@
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn get-file
-  "return file response with files mime type set to content-type"
+  "return file response with file's mime type set to content-type"
   [db id]
   (try
     (let [result (db/get-file db id)]
@@ -59,7 +59,7 @@
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn create-file
-  "create file and return json response for created file"
+  "create file and return json response"
   [db request]
   (let [file-param (get (:params request) "file")
         file-name (:filename file-param)
@@ -74,11 +74,11 @@
         (catch Exception e (json-error (.getMessage e)))))))
 
 (defn delete-file
-  "delete file and return json response"
+  "delete file and return delete count as json response"
   [db id]
   (try
     (let [result (into [] (db/delete-file db id))]
-      (json-ok (str (first result))))
+      (json-ok {:result (first result)}))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn index
