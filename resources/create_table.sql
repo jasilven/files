@@ -1,6 +1,6 @@
 CREATE TABLE files (
      id CHARACTER VARYING(255) PRIMARY KEY,
-     created TIMESTAMP DEFAULT 'now()',
+     created TIMESTAMP NOT NULL,
      mime_type CHARACTER VARYING(255) NOT NULL,
      file_name CHARACTER VARYING(255) NOT NULL,
      file_data BYTEA NOT NULL

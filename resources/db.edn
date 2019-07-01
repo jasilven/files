@@ -1,0 +1,6 @@
+{:dbtype "postgresql"
+ :dbname "documents"
+ :host "localhost"
+ :port 5432
+ :user "gqf5100"
+ :password "postgres"}

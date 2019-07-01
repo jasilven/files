@@ -7,5 +7,6 @@
                  [compojure "1.6.1"]
                  [org.clojure/data.json "0.2.6"]
                  [hiccup "1.0.5"]]
-  :main files
-  :aot [files])
+  :main files.core
+  :profiles {:uberjar {:aot :all}
+             :dev {ˆ:skip-aot :all}})
