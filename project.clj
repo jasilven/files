@@ -7,7 +7,8 @@
                  [org.clojure/java.jdbc "0.7.9"]
                  [compojure "1.6.1"]
                  [org.clojure/data.json "0.2.6"]
-                 [hiccup "1.0.5"]]
+                 [hiccup "1.0.5"]
+                 [org.clojure/tools.logging "0.4.1"]]
   :main files.core
   :profiles {:uberjar {:aot :all}
              :dev {ˆ:skip-aot :all}})

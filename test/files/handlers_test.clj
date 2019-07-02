@@ -19,11 +19,11 @@
 
 (t/deftest get-files-empty
   (t/testing "get-files from empty db"
-    (t/is (= [] (h/get-files test-db 10 false)))
+    (t/is (= [] (h/get-files test-db 10)))
     (t/is (= {:status 200
               :body "[]"
               :headers {"Content-Type" "application/json"}}
-             (h/get-files test-db 10 true)))))
+             (h/get-files-json test-db 10)))))
 
 (t/deftest create-file
   (t/testing "create-file"
@@ -49,7 +49,7 @@
 (t/deftest create-and-get-files
   (t/testing "create and then get files"
     (let [_ (h/create-file test-db test-params)
-          response (h/get-files test-db 10 true)
+          response (h/get-files-json test-db 10)
           get-body (json/read-str (:body response) :key-fn keyword)]
       (t/is (= 200 (:status response)))
       (t/is (= 1 (count get-body)))

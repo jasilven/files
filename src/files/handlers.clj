@@ -1,6 +1,7 @@
 (ns files.handlers
   (:require [hiccup.core :refer [html]]
             [clojure.data.json :as json]
+            [clojure.tools.logging :as log]
             [clojure.java.io :as io]
             [files.db :as db]))
 
@@ -26,33 +27,47 @@
    :headers {"Content-Type" "application/json"}})
 
 (def ok (partial response 200))
-(def error (partial response 400))
+
+(defn error
+  [msg]
+  (log/error msg)
+  (let [emsg [:html [:meta {:charset "UTF-8"}]
+              [:body [:h3 "Error"] [:pre msg]]]]
+    (response 400 emsg)))
+
 (def json-ok (partial json-response 200))
-(defn json-error [msg] (json-response 400 {:error msg}))
+
+(defn json-error
+  [msg]
+  (log/error msg)
+  (json-response 400 {:error msg}))
 
 (defn get-files
-  "return files as vector or as json response if to-json is true"
-  [db limit to-json]
+  "return files as vector. throws if error"
+  [db limit]
+  (let [limit (if (pos-int? limit) limit
+                  (try (Integer/parseInt limit) (catch Exception e db/DEFAULT-LIMIT)))]
+    (into [] (db/get-files db limit))))
+
+(defn get-files-json
+  "return files as json response"
+  [db limit]
   (try
-    (let [result (into [] (db/get-files db (if (nil? limit) 100 limit)))]
-      (if to-json
-        (json-ok (map #(dissoc % :file_data) result))
-        result))
+    (json-ok (map #(dissoc % :file_data) (get-files db limit)))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn get-file-info
   "return file info as json response"
   [db id]
   (try
-    (let [result (db/get-file db id)]
-      (json-ok (dissoc result :file_data)))
+    (json-ok (db/get-file db id false))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn get-file
   "return file response with file's mime type set to content-type"
   [db id]
   (try
-    (let [result (db/get-file db id)]
+    (let [result (db/get-file db id true)]
       {:status 200
        :headers {"Content-type" (:mime_type result)}
        :body (io/input-stream (:file_data result))})
@@ -61,47 +76,44 @@
 (defn create-file
   "create file and return json response"
   [db request]
-  (let [file-param (get (:params request) "file")
-        file-name (:filename file-param)
-        content-type (:content-type file-param)
-        file-data (file->bytes (:tempfile file-param))]
-    (if (or (empty? file-name)
-            (empty? file-data))
-      (json-error (str "file missing or empty file"))
-      (try
+  (try
+    (let [file-param (get (:params request) "file")
+          file-name (:filename file-param)
+          content-type (:content-type file-param)
+          file-data (file->bytes (:tempfile file-param))]
+      (if (or (empty? file-name)
+              (empty? file-data))
+        (json-error (str "file missing or empty file"))
         (let [result (db/create-file db file-name content-type file-data)]
-          (json-ok (dissoc result :file_data)))
-        (catch Exception e (json-error (.getMessage e)))))))
+          (json-ok (dissoc result :file_data)))))
+    (catch Exception e (json-error (.getMessage e)))))
 
 (defn delete-file
   "delete file and return delete count as json response"
   [db id]
   (try
-    (let [result (into [] (db/delete-file db id))]
-      (json-ok {:result (first result)}))
+    (json-ok {:result (first (db/delete-file db id))})
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn index
   "return main page as html"
   [db uri]
-  (if (db/db-connection? db)
-    (ok [:html [:meta {:charset "UTF-8"}]
-         [:body
-          [:h3 "Database"]
-          [:pre (:dbtype db) " at " (:host db) ":" (:port db) " using database " (:dbname db)]
-          [:h3 "Upload"]
-          [:form {:action uri :method "post" :enctype "multipart/form-data"}
-           [:input {:name "file" :type "file" :size "40"}]
-           [:input {:type "submit" :name "submit" :value "submit"}]]
-          [:h3 "Recent files"]
-          [:ul
-           (for [file (get-files db 50 false)]
-             [:li
-              [:a {:href (str uri "/" (:id file))} (:file_name file)] " "
-              (:created file) " "
-              [:i (:mime_type file)]])]]])
-    (error [:html [:meta {:charset "UTF-8"}]
-            [:body
-             [:h3 "No db connection available !"]
-             [:pre "Trying to use " (:dbtype db) " at " (:host db) ":" (:port db) " and database " (:dbname db)]]])))
-
+  (try
+    (if (db/db-connection? db)
+      (let [files (get-files db 50)]
+        (ok [:html [:meta {:charset "UTF-8"}]
+             [:body
+              [:h3 "Database for files"]
+              [:pre (:dbtype db) " at " (:host db) ":" (:port db) " using db " (:dbname db)]
+              [:h3 "Upload"]
+              [:form {:action uri :method "post" :enctype "multipart/form-data"}
+               [:input {:name "file" :type "file" :size "40"}]
+               [:input {:type "submit" :name "submit" :value "submit"}]]
+              [:h3 "Latest files"]
+              [:ul (for [file files]
+                     [:li
+                      [:a {:href (str uri "/" (:id file))} (:file_name file)] " "
+                      (:created file) " "
+                      [:i (:mime_type file)]])]]]))
+      (error "No db connection available!"))
+    (catch Exception e (error (.getMessage e)))))

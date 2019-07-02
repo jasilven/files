@@ -45,13 +45,13 @@
                                         bytes)
                         :file_data)
         id (:id created)
-        getted (dissoc (db/get-file test-db id) :file_data)]
+        getted (db/get-file test-db id false)]
     (t/is (= getted created))
-    (t/is (thrown? Exception (db/get-file "non-existing-db" id)))
-    (t/is (thrown? Exception (db/get-file test-db "non-existing-id")))))
+    (t/is (thrown? Exception (db/get-file "non-existing-db" id false)))
+    (t/is (thrown? Exception (db/get-file test-db "non-existing-id" false)))))
 
 (t/deftest get-files
-  (let [cnt 100
+  (let [cnt 20
         bytes (h/file->bytes testfile)]
     (dotimes [n cnt]
       (db/create-file test-db
