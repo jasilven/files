@@ -36,11 +36,10 @@
 (defn stop
   "gracefully stop the web server"
   []
-  (let [shutdown-secs (or (get config :shutdown-secs) 5)]
-    (when (some? @http-server)
-      (log/info (str "server shutdown in " shutdown-secs "s"))
-      (future (.stop @http-server))
-      "Bye")))
+  (when (some? @http-server)
+    (log/info "server shutdown in progress.." )
+    (future (.stop @http-server))
+    "Bye"))
 
 ;; define routes
 (defroutes all-routes
