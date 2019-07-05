@@ -39,12 +39,13 @@
   (let [shutdown-secs (or (get config :shutdown-secs) 5)]
     (when (some? @http-server)
       (log/info (str "server shutdown in " shutdown-secs "s"))
-      (.stop @http-server))))
+      (future (.stop @http-server))
+      "Bye")))
 
 ;; define routes
 (defroutes all-routes
   (GET "/admin" []  (h/index db-spec "/api/files" "/admin/shutdown"))
-  (GET "/admin/shutdown" [])
+  (GET "/admin/shutdown" [] (stop))
   (GET "/api/files/:id" [id] (h/get-file db-spec id))
   (DELETE "/api/files/:id" [id] (h/delete-file db-spec id))
   (GET "/api/files" [limit] (h/get-files-json db-spec limit))
