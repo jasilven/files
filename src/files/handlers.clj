@@ -1,9 +1,9 @@
 (ns files.handlers
-  (:require [hiccup.core :refer [html]]
-            [clojure.data.json :as json]
-            [clojure.tools.logging :as log]
+  (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
-            [files.db :as db]))
+            [clojure.tools.logging :as log]
+            [files.db :as db]
+            [hiccup.core :refer [html]]))
 
 (extend-type java.sql.Timestamp
   json/JSONWriter
@@ -97,7 +97,7 @@
 
 (defn index
   "return main page as html"
-  [db uri]
+  [db api-uri stop-uri]
   (try
     (if (db/db-connection? db)
       (let [files (get-files db 50)]
@@ -106,13 +106,16 @@
               [:h3 "Database for files"]
               [:pre (:dbtype db) " at " (:host db) ":" (:port db) " using db " (:dbname db)]
               [:h3 "Upload"]
-              [:form {:action uri :method "post" :enctype "multipart/form-data"}
+              [:form {:action api-uri :method "post" :enctype "multipart/form-data"}
                [:input {:name "file" :type "file" :size "40"}]
                [:input {:type "submit" :name "submit" :value "submit"}]]
+              [:h3 "Server shutdown"]
+              [:form {:action stop-uri :method "get"}
+               [:button "Shutdown server"]]
               [:h3 "Latest files"]
               [:ul (for [file files]
                      [:li
-                      [:a {:href (str uri "/" (:id file))} (:file_name file)] " "
+                      [:a {:href (str api-uri "/" (:id file))} (:file_name file)] " "
                       (:created file) " "
                       [:i (:mime_type file)]])]]]))
       (error "No db connection available!"))
