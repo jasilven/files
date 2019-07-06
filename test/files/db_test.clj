@@ -3,7 +3,7 @@
             [files.handlers :as h]
             [clojure.test :as t]))
 
-(def test-db (clojure.edn/read-string (slurp "resources/test_db.edn")))
+(def test-db (:db-spec (clojure.edn/read-string (slurp "config_test.edn"))))
 
 (def testfile "resources/testfile.pdf")
 
@@ -21,8 +21,8 @@
 (t/deftest files-exists
   (t/is (= true (db/files-exists? test-db)))
   (t/is (= false (db/files-exists? "non-existing-db"))))
-
 (t/deftest create-file
+
   (let [bytes (h/file->bytes testfile)
         fname "create-file testfile"
         mime  "application/pdf"

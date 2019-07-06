@@ -1,10 +1,10 @@
 (ns files.handlers-test
-  (:require [files.handlers :as h]
+  (:require [clojure.data.json :as json]
+            [clojure.test :as t]
             [files.db :as db]
-            [clojure.data.json :as json]
-            [clojure.test :as t]))
+            [files.handlers :as h]))
 
-(def test-db (clojure.edn/read-string (slurp "resources/test_db.edn")))
+(def test-db (:db-spec (clojure.edn/read-string (slurp "config_test.edn"))))
 (def test-file "resources/testfile.pdf")
 (def test-params {:params {"file" {:filename test-file
                                    :content-type "application/pdf"
@@ -41,9 +41,14 @@
     (let [create-resp (h/create-file test-db test-params)
           create-body (json/read-str (:body create-resp) :key-fn keyword)
           id (:id create-body)
-          get-resp (h/get-file test-db id)]
+          get-resp (h/get-file test-db id)
+          get-nonexist (h/get-file test-db (db/uuid))
+          get-invalid (h/get-file test-db "invalid-id")]
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status get-resp)))
+      (t/is (= 404 (:status get-nonexist)))
+      (t/is (= 400 (:status get-invalid)))
+      (t/is (= "{\"result\":" (subs (:body get-invalid) 0 10)))
       (t/is (< 0 (.available (:body get-resp)))))))
 
 (t/deftest create-and-get-files

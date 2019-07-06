@@ -40,7 +40,7 @@
 (defn json-error
   [msg]
   (log/error msg)
-  (json-response 400 {:error msg}))
+  (json-response 400 {:result msg}))
 
 (defn get-files
   "return files as vector. throws if error"
@@ -53,14 +53,17 @@
   "return files as json response"
   [db limit]
   (try
-    (json-ok (map #(dissoc % :file_data) (get-files db limit)))
+    (json-ok (get-files db limit))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn get-file-info
-  "return file info as json response"
+  "return file info (excluding the file itself) as json response"
   [db id]
   (try
-    (json-ok (db/get-file db id false))
+    (let [result (db/get-file db id false)]
+      (if (nil? result)
+        (json-response 404 {:result (str "not found, id: " id)})
+        (json-ok result)))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn get-file
@@ -68,9 +71,11 @@
   [db id]
   (try
     (let [result (db/get-file db id true)]
-      {:status 200
-       :headers {"Content-type" (:mime_type result)}
-       :body (io/input-stream (:file_data result))})
+      (if (nil? result)
+        (json-response 404 {:result (str "not found, id: " id)})
+        {:status 200
+         :headers {"Content-type" (:mime_type result)}
+         :body (io/input-stream (:file_data result))}))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn create-file
@@ -79,12 +84,11 @@
   (try
     (let [file-param (get (:params request) "file")
           file-name (:filename file-param)
-          content-type (:content-type file-param)
-          file-data (file->bytes (:tempfile file-param))]
-      (if (or (empty? file-name)
-              (empty? file-data))
-        (json-error (str "file missing or empty file"))
-        (let [result (db/create-file db file-name content-type file-data)]
+          content-type (:content-type file-param)]
+      (if (empty? file-name)
+        (json-error (str "file missing"))
+        (let [file-data (file->bytes (:tempfile file-param))
+              result (db/create-file db file-name content-type file-data)]
           (json-ok (dissoc result :file_data)))))
     (catch Exception e (json-error (.getMessage e)))))
 
@@ -113,10 +117,11 @@
               [:form {:action stop-uri :method "get"}
                [:button "Shutdown server"]]
               [:h3 "Latest files"]
-              [:ul (for [file files]
-                     [:li
-                      [:a {:href (str api-uri "/" (:id file))} (:file_name file)] " "
-                      (:created file) " "
-                      [:i (:mime_type file)]])]]]))
-      (error "No db connection available!"))
+              [:ul
+               (for [file files]
+                 [:li
+                  [:a {:href (str api-uri "/" (:id file))} (:file_name file)] " "
+                  (:created file) " "
+                  [:i (:mime_type file)]])]]]))
+      (error "No db connection!"))
     (catch Exception e (error (.getMessage e)))))

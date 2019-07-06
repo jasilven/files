@@ -1,7 +1,7 @@
 (ns files.core
   (:gen-class)
   (:require [clojure.tools.logging :as log]
-            [compojure.core :refer [defroutes DELETE GET POST]]
+            [compojure.core :refer [defroutes DELETE GET POST routes]]
             [compojure.route :as route]
             [files.db :as db]
             [files.handlers :as h]
@@ -20,7 +20,7 @@
   (System/exit 1))
 
 ;; read main configuration file
-(def config (try (clojure.edn/read-string (slurp "files.edn"))
+(def config (try (clojure.edn/read-string (slurp "config.edn"))
                  (catch Exception e (error-exit e))))
 
 ;; set up db configuration
@@ -36,21 +36,10 @@
 (defn stop
   "gracefully stop the web server"
   []
-  (let [shutdown-secs (or (get config :shutdown-secs) 5)]
-    (when (some? @http-server)
-      (log/info (str "server shutdown in " shutdown-secs "s"))
-      (future (.stop @http-server))
-      "Bye")))
-
-;; define routes
-(defroutes all-routes
-  (GET "/admin" []  (h/index db-spec "/api/files" "/admin/shutdown"))
-  (GET "/admin/shutdown" [] (stop))
-  (GET "/api/files/:id" [id] (h/get-file db-spec id))
-  (DELETE "/api/files/:id" [id] (h/delete-file db-spec id))
-  (GET "/api/files" [limit] (h/get-files-json db-spec limit))
-  (POST "/api/files" request (h/create-file db-spec request))
-  (route/not-found "Not found"))
+  (when (some? @http-server)
+    (log/info "server shutdown in progress..")
+    (future (.stop @http-server))
+    "Bye"))
 
 (defn authenticate
   "authenticate user and return authenticated user name or nil"
@@ -61,21 +50,34 @@
 
 (defn wrap-admin-routes
   "permit access only to admin user for routes starting with uri"
-  [handler uri]
+  [handler]
   (fn [request]
-    (if (clojure.string/starts-with? (:uri request) uri)
-      (if (= (get-in config [:admin :name]) (:basic-authentication request))
-        (handler request)
-        (access-denied (:basic-authentication request)))
-      (handler request))))
+    (if (= (get-in config [:admin :name]) (:basic-authentication request))
+      (handler request)
+      (access-denied (:basic-authentication request)))))
 
-;; setup route middleware
-(defroutes app
-  (-> all-routes
-      wrap-params
-      wrap-multipart-params
-      (wrap-admin-routes "/admin")
-      (wrap-basic-authentication authenticate)))
+(defroutes admin-routes
+  (GET "/admin" []  (h/index db-spec "/api/files" "/admin/shutdown"))
+  (GET "/admin/shutdown" [] (stop)))
+
+;; define routes
+(defroutes api-routes
+  (GET "/api/files/:id" [id] (h/get-file db-spec id))
+  (DELETE "/api/files/:id" [id] (h/delete-file db-spec id))
+  (GET "/api/files" [limit] (h/get-files-json db-spec limit))
+  (POST "/api/files" request (h/create-file db-spec request)))
+
+(defroutes pub-routes
+  (GET "/" [] (clojure.java.io/resource "public/index.html"))
+  (route/resources "/"))
+
+(def app
+  (routes pub-routes
+          (-> (routes api-routes (wrap-admin-routes admin-routes))
+              (wrap-basic-authentication authenticate)
+              wrap-params
+              wrap-multipart-params)
+          (route/not-found "Nothing")))
 
 (defn configurator
   "return configurator for jetty"
@@ -96,7 +98,7 @@
         (db/create-files-table db-spec))
       (if (db/files-exists? db-spec)
         (reset! http-server (run-jetty app (assoc (:jetty config)
-                                                        :configurator configurator)))
+                                                  :configurator configurator)))
         (error-exit "Problem with creating files table. Exiting."))
       (log/info "Server started")
       (catch Exception e (error-exit e)))
