@@ -12,17 +12,23 @@
 (def MAX-LIMIT 1000) ;; max query limit
 
 (defn uuid [] (.toString (java.util.UUID/randomUUID)))
-(defn valid-id? [id] (uuid? (java.util.UUID/fromString id)))
+(defn valid-id?
+  "return true if id is valid uuid else false"
+  [id]
+  (try
+    (uuid? (java.util.UUID/fromString id))
+    (catch Exception e false)))
+
 (defn timestamp [] (java.sql.Timestamp. (.getTime (java.util.Date.))))
 
 (defn db-connection?
-  "return true if db connection exists or false otherwise"
+  "return true if db connection exists else false"
   [db]
   (try (sql/query db ["SELECT COUNT(1+1)"]) true
        (catch Exception e false)))
 
 (defn files-exists?
-  "return true if files table exists or false otherwise"
+  "return true if files table exists or else false"
   [db]
   (try (sql/query db ["SELECT COUNT (*) FROM files"]) true
        (catch Exception e false)))
@@ -55,7 +61,8 @@
     (throw (Exception. "invalid file id"))))
 
 (defn get-files
-  "returns list of files up to limit or up to MAX-LIMIT if limit is greater than MAX-LIMIT. Throws if error."
+  "returns list of files (excluding file data) up to limit or
+  up to MAX-LIMIT if limit is greater than MAX-LIMIT. Throws if error."
   [db limit]
   (if (pos-int? limit)
     (sql/query db ["SELECT id, created, file_name, mime_type FROM files ORDER BY created DESC LIMIT ?"
@@ -63,7 +70,7 @@
     (throw (Exception. "invalid limit"))))
 
 (defn get-file
-  "return file map or nil if not found. File data included if binary? is true. Throws if error."
+  "return file as map or nil if not found. File data included if binary? is true. Throws if error."
   [db id binary?]
   (if (valid-id? id)
     (let [query (if binary?
@@ -72,4 +79,4 @@
           result (sql/query db [query id])]
       (if (nil? result) nil
           (first result)))
-    (throw (Exception. "File not found, maybe invalid file id"))))
+    (throw (Exception. (str "invalid file id: " id)))))

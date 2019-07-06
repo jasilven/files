@@ -1,0 +1,254 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "description": "API for files",
+        "version": "0.1.0",
+        "title": "Files",
+        "contact": {
+            "email": "me@me"
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "BasicAuth": {
+                "type": "http",
+                "scheme": "basic"
+            }
+        },
+        "schemas": {
+            "Error": {
+                "properties": {
+                    "result": {
+                        "description": "error message",
+                        "type": "string",
+                        "example": "this is error message"
+                    }
+                }
+            },
+            "File": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
+                    },
+                    "created": {
+                        "type": "string",
+                        "format": "timestamp",
+                        "example": "2020-11-04T09:41:27.412Z"
+                    },
+                    "file_name": {
+                        "type": "string",
+                        "example": "document.pdf"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "example": "application/pdf"
+                    }
+                },
+                "required": [
+                    "id",
+                    "created",
+                    "file_name",
+                    "mime_type"
+                ]
+            }
+        }
+    },
+    "security": [
+        {
+            "BasicAuth": []
+        }
+    ],
+    "servers": [
+        {
+            "url": "https://localhost:8080"
+        }
+    ],
+    "paths": {
+        "/api/files": {
+            "get": {
+                "description": "returns list of most recent files up to fixed or provided limit.",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "max number of files to return",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64",
+                            "minimum": 1,
+                            "maximum": 1000
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A JSON array of files",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/File"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized access"
+                    }
+                }
+            },
+            "post": {
+                "description": "create new file",
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "created file info",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/File"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized access"
+                    }
+                }
+            }
+        },
+        "/api/files/{id}":{
+            "delete": {
+                "description": "delele file by id",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "file id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "return number of deleted files or 0 if file not exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "result": {
+                                            "type": "integer",
+                                            "description": "number of deleted files"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized access"
+                    }
+                }
+            },
+            "get": {
+                "description": "returns single file by id",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "file id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "return file in pdf format",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "file not found"
+                    },
+                    "401": {
+                        "description": "unauthorized access"
+                    }
+                }
+            }
+        } 
+    }
+}
