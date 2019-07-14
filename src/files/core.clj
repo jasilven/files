@@ -1,9 +1,9 @@
 (ns files.core
-  (:gen-class)
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [defroutes DELETE GET POST routes]]
             [compojure.route :as route]
             [files.db :as db]
+            [jdbc.pool.c3p0 :as pool]
             [files.handlers :as h]
             [ring.adapter.jetty :refer [run-jetty]]
             [ring.middleware.basic-authentication
@@ -16,15 +16,15 @@
 (defn error-exit
   "print error message and exit"
   [err]
-  (log/error "Error:" (if instance? Exception err) (.getMessage err) err)
+  (log/error (str "Error:" (if (instance? Exception err) (.getMessage err) err)))
   (System/exit 1))
 
 ;; read main configuration file
 (def config (try (clojure.edn/read-string (slurp "config.edn"))
                  (catch Exception e (error-exit e))))
 
-;; set up db configuration
-(def db-spec (:db-spec config))
+;; set up db configuration with connection pooling
+(def db-spec (pool/make-datasource-spec (:db-pool config)))
 
 (defn access-denied
   "return http 403 response"
@@ -38,15 +38,18 @@
   []
   (when (some? @http-server)
     (log/info "server shutdown in progress..")
-    (future (.stop @http-server))
+    (future (.stop @http-server)
+            (log/info "closing db connections")
+            (.close (:datasource db-spec)))
     "Bye"))
 
 (defn authenticate
   "authenticate user and return authenticated user name or nil"
   [username password]
-  (if (= username (get-in config [:admin :name]))
-    (when (= password (get-in config [:admin :password])) username)
-    (when (= password (get-in config [:users username])) username)))
+  (when-not (or (nil? username) (nil? password))
+    (if (= username (get-in config [:admin :name]))
+      (when (= password (get-in config [:admin :password])) username)
+      (when (= password (get-in config [:users username])) username))))
 
 (defn wrap-admin-routes
   "permit access only to admin user for routes starting with uri"
@@ -56,28 +59,33 @@
       (handler request)
       (access-denied (:basic-authentication request)))))
 
-(defroutes admin-routes
-  (GET "/admin" []  (h/index db-spec "/api/files" "/admin/shutdown"))
-  (GET "/admin/shutdown" [] (stop)))
+(def admin-routes
+  (routes
+   (GET "/admin" []  (h/index db-spec "/api/files" "/admin/shutdown"))
+   (GET "/admin/shutdown" [] (stop))))
 
 ;; define routes
-(defroutes api-routes
-  (GET "/api/files/:id" [id] (h/get-file db-spec id))
-  (DELETE "/api/files/:id" [id] (h/delete-file db-spec id))
-  (GET "/api/files" [limit] (h/get-files-json db-spec limit))
-  (POST "/api/files" request (h/create-file db-spec request)))
+(def api-routes
+  (routes
+   (GET "/api/files/:id" [id] (h/get-file db-spec id))
+   (DELETE "/api/files/:id" [id] (h/delete-file db-spec id))
+   (GET "/api/files" [limit] (h/get-files-json db-spec limit))
+   (POST "/api/files" request (h/create-file db-spec request))))
 
-(defroutes pub-routes
-  (GET "/" [] (clojure.java.io/resource "public/index.html"))
-  (route/resources "/"))
+(def pub-routes
+  (routes
+   (GET "/swagger" [] (clojure.java.io/resource "public/index.html"))
+   (GET "/" [] (clojure.java.io/resource "public/index.html"))
+   (route/resources "/")))
 
 (def app
-  (routes pub-routes
-          (-> (routes api-routes (wrap-admin-routes admin-routes))
-              (wrap-basic-authentication authenticate)
-              wrap-params
-              wrap-multipart-params)
-          (route/not-found "Nothing")))
+  (routes
+   pub-routes
+   (-> (routes api-routes (wrap-admin-routes admin-routes))
+       (wrap-basic-authentication authenticate)
+       wrap-params
+       wrap-multipart-params)
+   (route/not-found "Nothing")))
 
 (defn configurator
   "return configurator for jetty"

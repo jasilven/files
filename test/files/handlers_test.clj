@@ -9,7 +9,6 @@
 (def test-params {:params {"file" {:filename test-file
                                    :content-type "application/pdf"
                                    :tempfile test-file}}})
-
 (defn test-fixture [f]
   (db/create-files-table test-db)
   (f)

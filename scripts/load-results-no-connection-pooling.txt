@@ -1,0 +1,10 @@
+Running 30s test @ https://127.0.0.1:8080/api/files
+  2 threads and 10 connections
+  Thread calibration: mean lat.: 1293.436ms, rate sampling interval: 4767ms
+  Thread calibration: mean lat.: 1299.064ms, rate sampling interval: 4866ms
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     5.50s     1.67s    8.62s    57.71%
+    Req/Sec   711.25      6.26   719.00     50.00%
+  43126 requests in 30.00s, 69.18MB read
+Requests/sec:   1437.52
+Transfer/sec:      2.31MB
