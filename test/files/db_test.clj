@@ -3,77 +3,87 @@
             [files.handlers :as h]
             [clojure.test :as t]))
 
-(def test-db (:db-spec (clojure.edn/read-string (slurp "config_test.edn"))))
+(def test-config)
+(def test-ds (db/get-datasource (read-string (slurp "config_test.edn"))))
 
 (def testfile "resources/testfile.pdf")
 
-(defn test-fixture [f]
-  (db/create-files-table test-db)
+(defn test-fixture-once [f]
   (f)
-  (db/drop-files-table test-db))
+  (.close test-ds))
 
-(t/use-fixtures :each test-fixture)
+(defn test-fixture-each [f]
+  (db/create-files-table test-ds)
+  (f)
+  (db/drop-files-table test-ds))
+
+(t/use-fixtures :once test-fixture-once)
+(t/use-fixtures :each test-fixture-each)
 
 (t/deftest connection
-  (t/is (= true (db/db-connection? test-db)))
+  (t/is (= true (db/db-connection? test-ds)))
   (t/is (= false (db/db-connection? "non-existing-db"))))
 
 (t/deftest files-exists
-  (t/is (= true (db/files-exists? test-db)))
+  (t/is (= true (db/files-exists? test-ds)))
   (t/is (= false (db/files-exists? "non-existing-db"))))
-(t/deftest create-file
 
+(t/deftest create-file
   (let [bytes (h/file->bytes testfile)
         fname "create-file testfile"
         mime  "application/pdf"
-        result (db/create-file test-db
-                               fname
-                               mime
-                               bytes)
-        id (:id result)]
-    (t/is (= fname (:file_name result)))
-    (t/is (= mime (:mime_type result)))
+        result (db/create-file test-ds fname mime bytes)
+        id (:files/id result)]
+    (t/is (= fname (:files/file_name result)))
+    (t/is (= mime (:files/mime_type result)))
     (t/is (= true
              (uuid? (java.util.UUID/fromString id))
              (db/valid-id? id)))))
 
 (t/deftest get-file
   (let [bytes (h/file->bytes testfile)
-        created (dissoc (db/create-file test-db
+        created (dissoc (db/create-file test-ds
                                         "get-file testfile"
                                         "application/pdf"
                                         bytes)
                         :file_data)
-        id (:id created)
-        getted (db/get-file test-db id false)]
-    (t/is (= getted created))
+        id (:files/id created)
+        getted (db/get-file test-ds id true)
+        getted-no-bin (db/get-file test-ds id false)]
+    (t/is (= (:files/id created) (:files/id getted)))
+    (t/is (= (:files/created created) (:files/created getted)))
+    (t/is (= (:files/file_name created) (:files/file_name getted)))
+    (t/is (= (:files/file_type created) (:files/file_type getted)))
+    (t/is (= (count (:files/file_data created)) (count (:files/file_data getted))))
     (t/is (thrown? Exception (db/get-file "non-existing-db" id false)))
-    (t/is (thrown? Exception (db/get-file test-db "non-existing-id" false)))))
+    (t/is (thrown? Exception (db/get-file test-ds "non-existing-id" false)))
+    (t/is (= true (contains? getted :files/file_data)))
+    (t/is (= false (contains? getted-no-bin :files/file_data)))))
 
 (t/deftest get-files
   (let [cnt 20
         bytes (h/file->bytes testfile)]
     (dotimes [n cnt]
-      (db/create-file test-db
+      (db/create-file test-ds
                       (str "get-files testfile" n)
                       "application/pdf"
                       bytes))
-    (t/is (= cnt (count (db/get-files test-db (+ 10 cnt)))))
-    (t/is (= 1 (count (db/get-files test-db 1))))
-    (t/is (thrown? Exception (db/get-files test-db 0)))
+    (t/is (= cnt (count (db/get-files test-ds (+ 10 cnt)))))
+    (t/is (= 1 (count (db/get-files test-ds 1))))
+    (t/is (thrown? Exception (db/get-files test-ds 0)))
     (t/is (thrown? Exception (db/get-files "non-existing-db")))
-    (t/is (thrown? Exception (db/get-files test-db -1)))))
+    (t/is (thrown? Exception (db/get-files test-ds -1)))))
 
 (t/deftest delete-file
   (let [bytes (h/file->bytes testfile)
-        created (dissoc (db/create-file test-db
+        created (dissoc (db/create-file test-ds
                                         "delete-file testfile"
                                         "application/pdf"
                                         bytes)
                         :file_data)
-        id (:id created)
-        deleted (db/delete-file test-db id)]
-    (t/is (thrown? Exception (db/delete-file test-db "non-existing-id")))
+        id (:files/id created)
+        deleted (db/delete-file test-ds id)]
+    (t/is (thrown? Exception (db/delete-file test-ds "non-existing-id")))
     (t/is (thrown? Exception (db/delete-file "non-existing-db" id)))
-    (t/is (= 1 (first deleted)))
-    (t/is (= 0 (count (db/get-files test-db 2))))))
+    (t/is (= #:next.jdbc{:update-count 1} deleted))
+    (t/is (= 0 (count (db/get-files test-ds 2))))))

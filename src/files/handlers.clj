@@ -1,6 +1,7 @@
 (ns files.handlers
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
+            [files.views :as views]
             [clojure.tools.logging :as log]
             [files.db :as db]
             [hiccup.core :refer [html]]))
@@ -73,9 +74,11 @@
     (let [result (db/get-file db id true)]
       (if (nil? result)
         (json-response 404 {:result (str "not found, id: " id)})
-        {:status 200
-         :headers {"Content-type" (:mime_type result)}
-         :body (io/input-stream (:file_data result))}))
+        (do
+          (spit "result.txt" result)
+          {:status 200
+           :headers {"Content-type" (:files/mime_type result)}
+           :body (io/input-stream (:files/file_data result))})))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn create-file
@@ -89,39 +92,19 @@
         (json-error (str "file missing"))
         (let [file-data (file->bytes (:tempfile file-param))
               result (db/create-file db file-name content-type file-data)]
+          (log/info "created result:" (dissoc result :file_data))
           (json-ok (dissoc result :file_data)))))
     (catch Exception e (json-error (.getMessage e)))))
 
 (defn delete-file
   "delete file and return delete count as json response"
-  [db id]
+  [ds id]
   (try
-    (json-ok {:result (first (db/delete-file db id))})
+    (json-ok {:result (first (db/delete-file ds id))})
     (catch Exception e (json-error (.getMessage e)))))
 
-(defn index
-  "return main page as html"
-  [db api-uri stop-uri]
-  (try
-    (if (db/db-connection? db)
-      (let [files (get-files db 50)]
-        (ok [:html [:meta {:charset "UTF-8"}]
-             [:body
-              [:h3 "Database for files"]
-              [:pre (:dbtype db) " at " (:host db) ":" (:port db) " using db " (:dbname db)]
-              [:h3 "Upload"]
-              [:form {:action api-uri :method "post" :enctype "multipart/form-data"}
-               [:input {:name "file" :type "file" :size "40"}]
-               [:input {:type "submit" :name "submit" :value "submit"}]]
-              [:h3 "Server shutdown"]
-              [:form {:action stop-uri :method "get"}
-               [:button "Shutdown server"]]
-              [:h3 "Latest files"]
-              [:ul
-               (for [file files]
-                 [:li
-                  [:a {:href (str api-uri "/" (:id file))} (:file_name file)] " "
-                  (:created file) " "
-                  [:i (:mime_type file)]])]]]))
-      (error "No db connection!"))
-    (catch Exception e (error (.getMessage e)))))
+(defn admin
+  "admin page"
+  [ds config api-uri shutdown-uri]
+  (try (ok (views/admin (get-files ds 50) config api-uri shutdown-uri))
+       (catch Exception e (error (.getMessage e)))))

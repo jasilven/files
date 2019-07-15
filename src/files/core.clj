@@ -3,7 +3,6 @@
             [compojure.core :refer [defroutes DELETE GET POST routes]]
             [compojure.route :as route]
             [files.db :as db]
-            [jdbc.pool.c3p0 :as pool]
             [files.handlers :as h]
             [ring.adapter.jetty :refer [run-jetty]]
             [ring.middleware.basic-authentication
@@ -20,11 +19,11 @@
   (System/exit 1))
 
 ;; read main configuration file
-(def config (try (clojure.edn/read-string (slurp "config.edn"))
+(def config (try (read-string (slurp "config.edn"))
                  (catch Exception e (error-exit e))))
 
 ;; set up db configuration with connection pooling
-(def db-spec (pool/make-datasource-spec (:db-pool config)))
+(def ds (try (db/get-datasource config) (catch Exception e (error-exit e))))
 
 (defn access-denied
   "return http 403 response"
@@ -40,7 +39,7 @@
     (log/info "server shutdown in progress..")
     (future (.stop @http-server)
             (log/info "closing db connections")
-            (.close (:datasource db-spec)))
+            (.close ds))
     "Bye"))
 
 (defn authenticate
@@ -61,16 +60,16 @@
 
 (def admin-routes
   (routes
-   (GET "/admin" []  (h/index db-spec "/api/files" "/admin/shutdown"))
+   (GET "/admin" []  (h/admin ds config "/api/files" "/admin/shutdown"))
    (GET "/admin/shutdown" [] (stop))))
 
 ;; define routes
 (def api-routes
   (routes
-   (GET "/api/files/:id" [id] (h/get-file db-spec id))
-   (DELETE "/api/files/:id" [id] (h/delete-file db-spec id))
-   (GET "/api/files" [limit] (h/get-files-json db-spec limit))
-   (POST "/api/files" request (h/create-file db-spec request))))
+   (GET "/api/files/:id" [id] (h/get-file ds id))
+   (DELETE "/api/files/:id" [id] (h/delete-file ds id))
+   (GET "/api/files" [limit] (h/get-files-json ds limit))
+   (POST "/api/files" request (h/create-file ds request))))
 
 (def pub-routes
   (routes
@@ -99,12 +98,12 @@
 (defn start
   "start application"
   []
-  (if (db/db-connection? db-spec)
+  (if (db/db-connection? ds)
     (try
-      (when-not (db/files-exists? db-spec)
+      (when-not (db/files-exists? ds)
         (log/info "DB connection ok, but files table missing. Creating files table.")
-        (db/create-files-table db-spec))
-      (if (db/files-exists? db-spec)
+        (db/create-files-table ds))
+      (if (db/files-exists? ds)
         (reset! http-server (run-jetty app (assoc (:jetty config)
                                                   :configurator configurator)))
         (error-exit "Problem with creating files table. Exiting."))
