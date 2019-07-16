@@ -105,6 +105,6 @@
 
 (defn admin
   "admin page"
-  [ds config api-uri shutdown-uri]
-  (try (ok (views/admin (get-files ds 50) config api-uri shutdown-uri))
+  [ds config]
+  (try (ok (views/admin (get-files ds 50) config))
        (catch Exception e (error (.getMessage e)))))

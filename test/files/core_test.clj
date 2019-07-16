@@ -16,6 +16,7 @@
     (t/is (= true (contains? (:headers (app {:uri "/api/files" :request-method :get :headers {}})) "WWW-Authenticate")))
     (t/is (= 401 (:status (app {:uri "/api/files/somefileid" :request-method :get :headers {}}))))
     (t/is (= 401 (:status (app {:uri "/api/files/somefileid" :request-method :delete :headers {}}))))
-    (t/is (= 401 (:status (app {:uri "/admin" :request-method :get  :headers {}}))))
+    (t/is (= 401 (:status (app {:uri "/admin" :request-method :get :headers {}}))))
+    (t/is (= 401 (:status (app {:uri "/admin/delete/someid" :request-method :get :headers {}}))))
     (t/is (= true (contains? (:headers (app {:uri "/admin" :request-method :get :headers {}})) "WWW-Authenticate")))
     (t/is (= 401 (:status (app {:uri "/admin/shutdown" :request-method :get :headers {}}))))))

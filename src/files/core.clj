@@ -60,7 +60,8 @@
 
 (def admin-routes
   (routes
-   (GET "/admin" []  (h/admin ds config "/api/files" "/admin/shutdown"))
+   (GET "/admin" []  (h/admin ds config))
+   (GET "/admin/delete/:id" [id] (h/delete-file ds id))
    (GET "/admin/shutdown" [] (stop))))
 
 ;; define routes

@@ -9,12 +9,17 @@
 (def test-params {:params {"file" {:filename test-file
                                    :content-type "application/pdf"
                                    :tempfile test-file}}})
-(defn test-fixture [f]
+(defn test-fixture-each [f]
   (db/create-files-table test-ds)
   (f)
   (db/drop-files-table test-ds))
 
-(t/use-fixtures :each test-fixture)
+(defn test-fixture-once [f]
+  (f)
+  (.close test-ds))
+
+(t/use-fixtures :each test-fixture-each)
+(t/use-fixtures :once test-fixture-once)
 
 (t/deftest get-files-empty
   (t/testing "get-files from empty db"
