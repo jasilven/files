@@ -55,13 +55,13 @@ CREATE TABLE files (id CHARACTER VARYING(255) PRIMARY KEY,
   (jdbc/execute! db files-table-drop))
 
 (defn create-file
-  "create file and return map of created file. Throws if error."
+  "create file and return id of created file as map. Throws if error."
   [db file-name mime-type file-data]
   (sql/insert! db :files {:id (uuid)
                           :created (timestamp)
                           :file_name file-name
                           :mime_type mime-type
-                          :file_data file-data}))
+                          :file_data file-data} {:return-keys ["id"]}))
 (defn delete-file
   "delete file. Throws if error."
   [db id]

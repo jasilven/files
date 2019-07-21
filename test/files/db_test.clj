@@ -34,8 +34,6 @@
         mime  "application/pdf"
         result (db/create-file test-ds fname mime bytes)
         id (:files/id result)]
-    (t/is (= fname (:files/file_name result)))
-    (t/is (= mime (:files/mime_type result)))
     (t/is (= true
              (uuid? (java.util.UUID/fromString id))
              (db/valid-id? id)))))
@@ -51,10 +49,7 @@
         getted (db/get-file test-ds id true)
         getted-no-bin (db/get-file test-ds id false)]
     (t/is (= (:files/id created) (:files/id getted)))
-    (t/is (= (:files/created created) (:files/created getted)))
-    (t/is (= (:files/file_name created) (:files/file_name getted)))
     (t/is (= (:files/file_type created) (:files/file_type getted)))
-    (t/is (= (count (:files/file_data created)) (count (:files/file_data getted))))
     (t/is (thrown? Exception (db/get-file "non-existing-db" id false)))
     (t/is (thrown? Exception (db/get-file test-ds "non-existing-id" false)))
     (t/is (= true (contains? getted :files/file_data)))

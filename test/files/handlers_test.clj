@@ -35,10 +35,7 @@
           body (json/read-str (:body response) :key-fn keyword)]
       (t/is (= 200 (:status response)))
       (t/is (= {"Content-Type" "application/json"} (:headers response)))
-      (t/is (= false (empty? (:id body))))
-      (t/is (= false (empty? (:created body))))
-      (t/is (= "application/pdf" (:mime_type body)))
-      (t/is (= test-file (:file_name body))))))
+      (t/is (= false (empty? (:id body)))))))
 
 (t/deftest create-and-get-file
   (t/testing "create and then get single file with data"

@@ -75,7 +75,6 @@
       (if (nil? result)
         (json-response 404 {:result (str "not found, id: " id)})
         (do
-          (spit "result.txt" result)
           {:status 200
            :headers {"Content-type" (:files/mime_type result)}
            :body (io/input-stream (:files/file_data result))})))
