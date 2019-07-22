@@ -146,8 +146,56 @@
                                 }
                             }
                         }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized access"
                     }
-                    ,
+                }
+            }
+        },
+        "/api/files/{id}": {
+            "delete": {
+                "description": "delele file by id",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "file id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "return number of deleted files or 0 if file not exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "result": {
+                                            "type": "integer",
+                                            "description": "number of deleted files"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                     "400": {
                         "description": "error",
                         "content": {
@@ -163,97 +211,48 @@
                     }
                 }
             },
-            "/api/files/{id}": {
-                "delete": {
-                    "description": "delele file by id",
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": true,
-                            "description": "file id",
-                            "schema": {
-                                "type": "string",
-                                "format": "uuid",
-                                "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
-                            }
-                        }
-                    ],
-                    "responses": {
-                        "200": {
-                            "description": "return number of deleted files or 0 if file not exists",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {
-                                            "result": {
-                                                "type": "integer",
-                                                "description": "number of deleted files"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "400": {
-                            "description": "error",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/Error"
-                                    }
-                                }
-                            }
-                        },
-                        "401": {
-                            "description": "unauthorized access"
+            "get": {
+                "description": "returns single file by id",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "file id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
                         }
                     }
-                },
-                "get": {
-                    "description": "returns single file by id",
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": true,
-                            "description": "file id",
-                            "schema": {
-                                "type": "string",
-                                "format": "uuid",
-                                "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
-                            }
-                        }
-                    ],
-                    "responses": {
-                        "200": {
-                            "description": "return file in pdf format",
-                            "content": {
-                                "application/pdf": {
-                                    "schema": {
-                                        "type": "string",
-                                        "format": "binary"
-                                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "return file in pdf format",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
                                 }
                             }
-                        },
-                        "400": {
-                            "description": "error",
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "$ref": "#/components/schemas/Error"
-                                    }
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
-                        },
-                        "404": {
-                            "description": "file not found"
-                        },
-                        "401": {
-                            "description": "unauthorized access"
                         }
+                    },
+                    "404": {
+                        "description": "file not found"
+                    },
+                    "401": {
+                        "description": "unauthorized access"
                     }
                 }
             }
