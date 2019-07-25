@@ -13,6 +13,11 @@
             "BasicAuth": {
                 "type": "http",
                 "scheme": "basic"
+            },
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT"
             }
         },
         "schemas": {
@@ -22,6 +27,19 @@
                         "description": "error message",
                         "type": "string",
                         "example": "this is error message"
+                    }
+                }
+            },
+            "UpdateCount": {
+                "properties": {
+                    "result": {
+                        "properties": {
+                            "update-count": {
+                                "type": "integer",
+                                "format":"int64",
+                                "example": 1
+                            }
+                        }
                     }
                 }
             },
@@ -37,6 +55,11 @@
                         "format": "timestamp",
                         "example": "2020-11-04T09:41:27.412Z"
                     },
+                    "updated": {
+                        "type": "string",
+                        "format": "timestamp",
+                        "example": "2020-12-05T09:41:27.412Z"
+                    },
                     "file_name": {
                         "type": "string",
                         "example": "document.pdf"
@@ -49,6 +72,7 @@
                 "required": [
                     "id",
                     "created",
+                    "updated",
                     "file_name",
                     "mime_type"
                 ]
@@ -113,25 +137,37 @@
                 }
             },
             "post": {
-                "description": "create new file",
+                "description": "create new file, file_data that is base64 encoded char string",
                 "requestBody": {
                     "content": {
-                        "multipart/form-data": {
+                        "application/json": {
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "file": {
+                                    "file_name": {
                                         "type": "string",
-                                        "format": "binary"
+                                        "example": "document.pdf"
+                                    },
+                                    "file_data": {
+                                        "type": "string",
+                                        "format": "byte"
+                                    },
+                                    "mime_type": {
+                                        "type": "string",
+                                        "example": "application/pdf"
                                     }
-                                }
+                                },
+                                "required": [
+                                    "file_name",
+                                    "mime_type"
+                                ]
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "created file info",
+                        "description": "created file id",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -164,6 +200,70 @@
             }
         },
         "/api/files/{id}": {
+            "put": {
+                "description": "update existing file",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file_name": {
+                                        "type": "string",
+                                        "example": "document.pdf"
+                                    },
+                                    "mime_type": {
+                                        "type": "string",
+                                        "example": "application/pdf"
+                                    }
+                                },
+                                "required": [
+                                    "file_name",
+                                    "mime_type"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "file id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "example": "00f40d12-b1de-4c2b-8ce9-2bed59b31118"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ok",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdateCount"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "unauthorized access"
+                    }
+                }
+            },
             "delete": {
                 "description": "delele file by id",
                 "parameters": [
@@ -185,13 +285,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "result": {
-                                            "type": "integer",
-                                            "description": "number of deleted files"
-                                        }
-                                    }
+                                    "$ref": "#/components/schemas/UpdateCount"
                                 }
                             }
                         }
@@ -228,12 +322,11 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "return file in pdf format",
+                        "description": "return file",
                         "content": {
-                            "application/pdf": {
+                            "application/json": {
                                 "schema": {
-                                    "type": "string",
-                                    "format": "binary"
+                                    "$ref": "#/components/schemas/File"
                                 }
                             }
                         }

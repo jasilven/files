@@ -1,6 +1,6 @@
 (ns files.core
   (:require [clojure.tools.logging :as log]
-            [compojure.core :refer [defroutes DELETE GET POST routes]]
+            [compojure.core :refer [defroutes DELETE GET PUT POST routes]]
             [compojure.route :as route]
             [files.db :as db]
             [files.handlers :as h]
@@ -25,10 +25,7 @@
 ;; set up db configuration with connection pooling
 (def ds (try (db/get-datasource config) (catch Exception e (error-exit e))))
 
-(defn access-denied
-  "return http 403 response"
-  [user]
-  {:status 403 :body (str "access denied for user " user) :headers {}})
+(def access-denied {:status 403 :body "access denied" :headers {}})
 
 (defonce http-server (atom nil))
 
@@ -50,27 +47,23 @@
       (when (= password (get-in config [:admin :password])) username)
       (when (= password (get-in config [:users username])) username))))
 
-(defn wrap-admin-routes
-  "permit access only to admin user for routes starting with uri"
-  [handler]
-  (fn [request]
-    (if (= (get-in config [:admin :name]) (:basic-authentication request))
-      (handler request)
-      (access-denied (:basic-authentication request)))))
+(defn admin? [request]
+  (= (get-in config [:admin :name]) (:basic-authentication request)))
 
 (def admin-routes
   (routes
-   (GET "/admin" []  (h/admin ds config))
-   (GET "/admin/delete/:id" [id] (h/delete-file ds id))
-   (GET "/admin/shutdown" [] (stop))))
+   (GET "/admin" request (if (admin? request) (h/admin ds config) access-denied))
+   (GET "/admin/delete/:id" [id :as request] (if (admin? request) (h/delete-document ds id) access-denied))
+   (GET "/admin/download/:id" [id :as request] (if (admin? request) (h/download-document ds id) access-denied))
+   (GET "/admin/shutdown" request (if (admin? request) (stop) access-denied))))
 
-;; define routes
 (def api-routes
   (routes
-   (GET "/api/files/:id" [id] (h/get-file ds id))
-   (DELETE "/api/files/:id" [id] (h/delete-file ds id))
-   (GET "/api/files" [limit] (h/get-files-json ds limit))
-   (POST "/api/files" request (h/create-file ds request))))
+   (GET "/api/files/:id" [id] (h/get-document ds id true))
+   (PUT "/api/files/:id" [id :as request] (h/update-document ds id request))
+   (DELETE "/api/files/:id" [id] (h/delete-document ds id))
+   (GET "/api/files" [limit] (h/get-documents-json ds limit))
+   (POST "/api/files" request (h/create-document ds request))))
 
 (def pub-routes
   (routes
@@ -81,7 +74,7 @@
 (def app
   (routes
    pub-routes
-   (-> (routes api-routes (wrap-admin-routes admin-routes))
+   (-> (routes api-routes admin-routes)
        (wrap-basic-authentication authenticate)
        wrap-params
        wrap-multipart-params)
