@@ -4,6 +4,7 @@
             [compojure.route :as route]
             [files.db :as db]
             [files.handlers :as h]
+            [files.admin-handlers :as admin]
             [ring.adapter.jetty :refer [run-jetty]]
             [ring.middleware.basic-authentication
              :refer
@@ -13,7 +14,7 @@
   (:import org.eclipse.jetty.server.handler.StatisticsHandler))
 
 (defn error-exit
-  "print error message and exit"
+  "Print error message and exit."
   [err]
   (log/error (str "Error:" (if (instance? Exception err) (.getMessage err) err)))
   (System/exit 1))
@@ -30,7 +31,7 @@
 (defonce http-server (atom nil))
 
 (defn stop
-  "gracefully stop the web server"
+  "Gracefully shutdown the web server."
   []
   (when (some? @http-server)
     (log/info "server shutdown in progress..")
@@ -40,7 +41,7 @@
     "Bye"))
 
 (defn authenticate
-  "authenticate user and return authenticated user name or nil"
+  "Authenticate user and return authenticated user name or nil."
   [username password]
   (when-not (or (nil? username) (nil? password))
     (if (= username (get-in config [:admin :name]))
@@ -52,9 +53,12 @@
 
 (def admin-routes
   (routes
-   (GET "/admin" request (if (admin? request) (h/admin ds config) access-denied))
-   (GET "/admin/delete/:id" [id :as request] (if (admin? request) (h/delete-document ds id) access-denied))
-   (GET "/admin/download/:id" [id :as request] (if (admin? request) (h/download-document ds id) access-denied))
+   (GET "/admin" request (if (admin? request) (admin/main ds config) access-denied))
+   (POST "/admin/upload" request (if (admin? request) (admin/upload ds request) access-denied))
+   (GET "/admin/delete/:id" [id :as request] (if (admin? request) (admin/delete ds id) access-denied))
+   (GET "/admin/undelete/:id" [id :as request] (if (admin? request) (admin/undelete ds id) access-denied))
+   (GET "/admin/download/:id" [id :as request] (if (admin? request) (admin/download ds id) access-denied))
+   (GET "/admin/details/:id" [id :as request] (if (admin? request) (admin/details ds id) access-denied))
    (GET "/admin/shutdown" request (if (admin? request) (stop) access-denied))))
 
 (def api-routes
@@ -81,7 +85,7 @@
    (route/not-found "Nothing")))
 
 (defn configurator
-  "return configurator for jetty"
+  "Return configurator for jetty."
   [server]
   (let [stats-handler (StatisticsHandler.)]
     (.setHandler stats-handler (.getHandler server))
@@ -90,7 +94,7 @@
     (.setStopAtShutdown server true)))
 
 (defn start
-  "start application"
+  "Start application."
   []
   (if (db/db-connection? ds)
     (try

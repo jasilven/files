@@ -1,7 +1,7 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "description": "API for files",
+        "description": "REST-style API for document database storing all kinds of documents and their metadata.",
         "version": "0.1.0",
         "title": "Files",
         "contact": {
@@ -24,26 +24,21 @@
             "Error": {
                 "properties": {
                     "result": {
-                        "description": "error message",
+                        "description": "Error message",
                         "type": "string",
-                        "example": "this is error message"
+                        "example": "some error occured"
                     }
                 }
             },
-            "UpdateCount": {
+            "Result": {
                 "properties": {
                     "result": {
-                        "properties": {
-                            "update-count": {
-                                "type": "integer",
-                                "format":"int64",
-                                "example": 1
-                            }
-                        }
+                        "type": "string",
+                        "example": "success"
                     }
                 }
             },
-            "File": {
+            "Document": {
                 "properties": {
                     "id": {
                         "type": "string",
@@ -60,9 +55,26 @@
                         "format": "timestamp",
                         "example": "2020-12-05T09:41:27.412Z"
                     },
+                    "deleted": {
+                        "type": "string",
+                        "format": "timestamp",
+                        "example": "2020-12-05T09:41:27.412Z"
+                    },
                     "file_name": {
                         "type": "string",
                         "example": "document.pdf"
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "agreement"
+                    },
+                    "metadata": {
+                        "type": "string"
+                    },
+                    "file_size": {
+                        "type": "integer",
+                        "format": "int64",
+                        "example": "123456"
                     },
                     "mime_type": {
                         "type": "string",
@@ -74,6 +86,8 @@
                     "created",
                     "updated",
                     "file_name",
+                    "file_size",
+                    "category",
                     "mime_type"
                 ]
             }
@@ -92,13 +106,13 @@
     "paths": {
         "/api/files": {
             "get": {
-                "description": "returns list of most recent files up to fixed or provided limit.",
+                "description": "Returns list of most recent documents up to fixed or provided limit.",
                 "parameters": [
                     {
                         "name": "limit",
                         "in": "query",
                         "required": false,
-                        "description": "max number of files to return",
+                        "description": "max number of documents to return",
                         "schema": {
                             "type": "integer",
                             "format": "int64",
@@ -109,20 +123,20 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "A JSON array of files",
+                        "description": "A JSON array of documents",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/File"
+                                        "$ref": "#/components/schemas/Document"
                                     }
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "error",
+                        "description": "Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -132,12 +146,12 @@
                         }
                     },
                     "401": {
-                        "description": "unauthorized access"
+                        "description": "Unauthorized access"
                     }
                 }
             },
             "post": {
-                "description": "create new file, file_data that is base64 encoded char string",
+                "description": "Create new document with metadata, file_data should be base64 encoded string.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -155,10 +169,19 @@
                                     "mime_type": {
                                         "type": "string",
                                         "example": "application/pdf"
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "example": "offer"
+                                    },
+                                    "metadata": {
+                                        "type": "string",
+                                        "example": "{\"author\":\"Pulkkinen\",\"status\":\"draft\"}"
                                     }
                                 },
                                 "required": [
                                     "file_name",
+                                    "file_data",
                                     "mime_type"
                                 ]
                             }
@@ -167,7 +190,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "created file id",
+                        "description": "Document id",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -184,7 +207,7 @@
                         }
                     },
                     "400": {
-                        "description": "error",
+                        "description": "Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -194,14 +217,14 @@
                         }
                     },
                     "401": {
-                        "description": "unauthorized access"
+                        "description": "Unauthorized access"
                     }
                 }
             }
         },
         "/api/files/{id}": {
             "put": {
-                "description": "update existing file",
+                "description": "Update existing document, file_data should be base64 encoded string.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -212,14 +235,27 @@
                                         "type": "string",
                                         "example": "document.pdf"
                                     },
+                                    "file_data": {
+                                        "type": "string",
+                                        "format": "byte"
+                                    },
                                     "mime_type": {
                                         "type": "string",
                                         "example": "application/pdf"
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "example": "contract"
+                                    },
+                                    "metadata": {
+                                        "type": "string",
+                                        "example": "{\"author\":\"Pulkkinen\",\"status\":\"draft\"}"
                                     }
                                 },
                                 "required": [
                                     "file_name",
-                                    "mime_type"
+                                    "mime_type",
+                                    "file_data"
                                 ]
                             }
                         }
@@ -230,7 +266,7 @@
                         "name": "id",
                         "in": "path",
                         "required": true,
-                        "description": "file id",
+                        "description": "Document id",
                         "schema": {
                             "type": "string",
                             "format": "uuid",
@@ -240,17 +276,17 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Ok",
+                        "description": "Success",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/UpdateCount"
+                                    "$ref": "#/components/schemas/Result"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "error",
+                        "description": "Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -260,18 +296,19 @@
                         }
                     },
                     "401": {
-                        "description": "unauthorized access"
+                        "description": "Unauthorized access"
                     }
                 }
             },
             "delete": {
-                "description": "delele file by id",
+                "description": "Delele document by id.",
+
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
                         "required": true,
-                        "description": "file id",
+                        "description": "Document id",
                         "schema": {
                             "type": "string",
                             "format": "uuid",
@@ -281,17 +318,17 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "return number of deleted files or 0 if file not exists",
+                        "description": "Success",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/UpdateCount"
+                                    "$ref": "#/components/schemas/Result"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "error",
+                        "description": "Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -301,18 +338,18 @@
                         }
                     },
                     "401": {
-                        "description": "unauthorized access"
+                        "description": "Unauthorized access"
                     }
                 }
             },
             "get": {
-                "description": "returns single file by id",
+                "description": "Returns single document by id.",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
                         "required": true,
-                        "description": "file id",
+                        "description": "Document id",
                         "schema": {
                             "type": "string",
                             "format": "uuid",
@@ -322,17 +359,17 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "return file",
+                        "description": "Return document",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/File"
+                                    "$ref": "#/components/schemas/Document"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "error",
+                        "description": "Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -341,11 +378,8 @@
                             }
                         }
                     },
-                    "404": {
-                        "description": "file not found"
-                    },
                     "401": {
-                        "description": "unauthorized access"
+                        "description": "Unauthorized access"
                     }
                 }
             }
