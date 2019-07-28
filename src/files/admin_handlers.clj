@@ -34,12 +34,14 @@
       (if (nil? result)
         (response 404 (str "Document not found, id: " id))
         {:status 200
-         :headers {"Content-type" (:files/mime_type result)}
-         :body (io/input-stream (b64/decode (:files/file_data result)))}))
+         :headers {"Content-type" (:mime_type result)}
+         :body (io/input-stream (b64/decode (:file_data result)))}))
     (catch Exception e (error e "file download failed"))))
 
 
 ;; TODO: add unit test
+
+
 (defn upload
   "Create new document from form upload."
   [ds request]
@@ -67,22 +69,22 @@
     (catch Exception e (error e "unable to show document details"))))
 
 ;; TODO: add unit test
-(defn delete
-  "Mark document deleted."
+(defn close
+  "Mark document closed."
   [ds id]
   (try
-    (db/delete-document ds id)
+    (db/close-document ds id)
     (ok (views/details (db/get-document ds id false) (db/get-auditlogs ds id DEFAULT-LOG-LIMIT)))
     (catch Exception e (error e "document deletion failed"))))
 
 ;; TODO: add unit test
-(defn undelete
-  "Mark document undeleted."
+(defn open
+  "Mark document open."
   [ds id]
   (try
-    (db/undelete-document ds id)
+    (db/open-document ds id)
     (ok (views/details (db/get-document ds id false) (db/get-auditlogs ds id DEFAULT-LOG-LIMIT)))
-    (catch Exception e (error e "document undelete failed"))))
+    (catch Exception e (error e "document open failed"))))
 
 (defn main
   "Render admin page."

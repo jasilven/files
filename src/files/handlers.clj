@@ -1,6 +1,7 @@
 (ns files.handlers
   (:import java.util.Base64)
-  (:require [clojure.data.json :as json]
+  (:require [cheshire.core :as json]
+            [cheshire.generate :refer [add-encoder encode-str]]
             [clojure.tools.logging :as log]
             [files.db :as db]))
 
@@ -12,16 +13,21 @@
 ;;   (-write [date out]
 ;;     (json/-write (str date) out)))
 
-(extend-type java.time.Instant
-  json/JSONWriter
-  (-write [date out]
-    (json/-write (str date) out)))
+;; (extend-type java.time.Instant
+;;   json/JSONWriter
+;;   (-write [date out]
+;;     (json/-write (str date) out)))
+
+;; Instant -> JSON generator support for cheshire
+(add-encoder java.time.Instant
+             (fn [c jsonGenerator]
+               (.writeString jsonGenerator (str c))))
 
 (defn json-response
   "Return json response as response map."
   [status data]
   {:status status
-   :body (json/write-str data)
+   :body (json/generate-string data)
    :headers {"Content-Type" "application/json"}})
 
 (def json-ok (partial json-response 200))
@@ -29,7 +35,7 @@
 (defn json-error
   "Return error response as json and write msg to log."
   [code exp msg]
-  (log/error exp msg)
+  (log/error exp msg (ex-data exp))
   (json-response code {:result msg}))
 
 (defn get-documents
@@ -61,26 +67,26 @@
   "Create document and return id as json response."
   [ds request]
   (try
-    (let [document (json/read-str (slurp (:body request)) :key-fn keyword)]
+    (let [document (json/parse-string (slurp (:body request)) true)]
       (if (not-every? #(contains? document %) required-document-keys)
         (throw (ex-info "cannot create document, required field missing" {:request request}))
         (json-ok (db/create-document ds document))))
     (catch Exception e (json-error 400 e "document creation failed"))))
 
-(defn delete-document
-  "Delete document and return delete count as json response."
+(defn close-document
+  "close document and return close count as json response."
   [ds id]
   (try
-    (if (db/delete-document ds id)
+    (if (db/close-document ds id)
       (json-ok {:result "success"})
-      (throw (ex-info "cannot delete twice, document already deleted" {:id id})))
-    (catch Exception e (json-error 400 e "document delete failed"))))
+      (throw (ex-info "cannot close twice, document already closed" {:id id})))
+    (catch Exception e (json-error 400 e "document close failed"))))
 
 (defn update-document
   "Update document and return update count as json response."
   [ds id request]
   (try
-    (let [document (json/read-str (slurp (:body request)) :key-fn keyword)]
+    (let [document (json/parse-string (slurp (:body request)) true)]
       (if (not-every? #(contains? document %) required-document-keys)
         (throw (ex-info "required field missing" {:id id :request request}))
         (if (db/update-document ds id document)

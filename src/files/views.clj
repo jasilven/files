@@ -19,10 +19,10 @@
   [logs]
   [:table {:class "table table-sm"}
    [:thead {:class "thead-light"}
-    [:tr [:th "Date"] [:th "User"] [:th "Event"]]]
+    [:tr [:th "Id"] [:th "Date"] [:th "User"] [:th "Event"]]]
    [:tbody
     (for [log logs]
-      [:tr [:td (:auditlog/created log)] [:td (:auditlog/userid log) ] [:td (:auditlog/event log)]])]])
+      [:tr [:td (:id log)] [:td (:created log)] [:td (:userid log)] [:td (:event log)]])]])
 
 (defn details
   "Render document details page."
@@ -33,33 +33,33 @@
     (top-navi)
     [:div {:class "card mx-auto my-3" :style "width: 47rem;"}
      [:div {:class "card-header"}
-      [:h3 {:class "text-center font-weight-bolder"} (:files/file_name document)]
+      [:h3 {:class "text-center font-weight-bolder"} (:file_name document)]
       [:table {:class "table table-sm table-borderless"}
        [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Id:"]
-        [:td (:files/id document)]]
+        [:td (:id document)]]
        [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Type:"]
-        [:td (:files/mime_type document)]]
+        [:td (:mime_type document)]]
        [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Category:"]
-        [:td (:files/category document)]]
+        [:td (:category document)]]
        [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Created:"]
-        [:td (:files/created document)]]
+        [:td (:created document)]]
        [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Updated:"]
-        [:td (:files/updated document)]]
-       [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Deleted:"]
-        [:td (:files/deleted document)]]]
-      [:a {:class "badge badge-primary jml-3" :href (str "/admin/download/" (:files/id document))} "download"]
-      [:a {:class "badge badge-info ml-3" :href (str "/api/files/" (:files/id document))} "json"]
-      [:a {:class "badge badge-danger ml-3" :href (str "/admin/delete/" (:files/id document))} "delete"]
-      [:a {:class "badge badge-danger ml-3" :href (str "/admin/undelete/" (:files/id document))} "undelete"]]
+        [:td (:updated document)]]
+       [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "closed:"]
+        [:td (:closed document)]]]
+      [:a {:class "badge badge-primary jml-3" :href (str "/admin/download/" (:id document))} "download"]
+      [:a {:class "badge badge-info ml-3" :href (str "/api/files/" (:id document))} "json"]
+      [:a {:class "badge badge-danger ml-3" :href (str "/admin/close/" (:id document))} "close"]
+      [:a {:class "badge badge-danger ml-3" :href (str "/admin/open/" (:id document))} "open"]]
      [:div {:class "card-body"}
       [:h4 "Metadata"]
       [:table {:class "table table-sm table-striped"}
        [:thead {:class "thead-dark"} [:tr [:th {:style "width: 220px;"} "Name"] [:th "Value"]]]
        [:tbody
-        (for [key (sort (keys (:files/metadata document)))]
+        (for [key (sort (keys (:metadata document)))]
           [:tr
-           [:td {:class "font-weight-bolder"} key] [:td (get (:files/metadata document) key)]])]]
-      [:h4 "Auditlog"]
+           [:td {:class "font-weight-bolder"} key] [:td (get (:metadata document) key)]])]]
+      [:h4 (format "Latest %d auditlogs" (count logs))]
       (auditlog logs)]]]])
 
 (defn error
@@ -79,8 +79,7 @@
         [:h4 "Stacktrace"]
         [:pre trace]
         [:h4 "Info"]
-        [:pre info]
-        ]]]]))
+        [:pre info]]]]]))
 
 (defn admin
   "Render admin main page."
@@ -113,14 +112,14 @@
         [:th {:scope "col"} "Type"]
         [:th {:scope "col"} "Created"]
         [:th {:scope "col"} "Updated"]
-        [:th {:scope "col"} "Deleted"]
+        [:th {:scope "col"} "closed"]
         [:th {:scope "col" :class "text-right"} "File Size (KB)"]]]
       [:tbody
        (for [d documents]
-         [:tr {:onclick (str "jump('/admin/details/" (:files/id d) "')")}
-          [:th {:scope "row"} (shorten (:files/file_name d) 30)]
-          [:td {:class "font-weight-light"} [:i (shorten (:files/mime_type d) 25)]]
-          [:td {:class "font-weight-light"} (:files/created d)]
-          [:td {:class "font-weight-light"} (:files/updated d)]
-          [:td {:class "font-weight-light"} (:files/deleted d)]
-          [:td {:class "font-weight-light text-right"} (str (int (/ (:files/file_size d) 1000)))]])]]]]])
+         [:tr {:onclick (str "jump('/admin/details/" (:id d) "')")}
+          [:th {:scope "row"} (shorten (:file_name d) 30)]
+          [:td {:class "font-weight-light"} [:i (shorten (:mime_type d) 25)]]
+          [:td {:class "font-weight-light"} (:created d)]
+          [:td {:class "font-weight-light"} (:updated d)]
+          [:td {:class "font-weight-light"} (:closed d)]
+          [:td {:class "font-weight-light text-right"} (str (int (/ (:file_size d) 1000)))]])]]]]])

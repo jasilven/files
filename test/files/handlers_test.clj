@@ -1,5 +1,5 @@
 (ns files.handlers-test
-  (:require [clojure.data.json :as json]
+  (:require [cheshire.core :as json]
             [clojure.test :as t]
             [files.db :as db]
             [files.b64 :as b64]
@@ -17,7 +17,7 @@
 (defn response->document
   "parse document from http response to document edn"
   [response]
-  (json/read-str (:body response) :key-fn keyword))
+  (json/parse-string (:body response) true))
 
 (defn test-fixture-each [f]
   (db/create-files-table test-ds)
@@ -41,7 +41,7 @@
 
 (t/deftest create-test
   (t/testing "create document"
-    (let [body (.getBytes (json/write-str test-document))
+    (let [body (.getBytes (json/generate-string test-document))
           response (h/create-document test-ds {:body body})
           document (response->document response)]
       (t/is (= 200 (:status response)))
@@ -49,13 +49,13 @@
       (t/is (= false (empty? (:id document))))))
   (t/testing "create without required field"
     (let [test-doc (dissoc test-document :mime_type)
-          body (.getBytes (json/write-str test-doc))
+          body (.getBytes (json/generate-string test-doc))
           response (h/create-document test-ds {:body body})]
       (t/is (= 400 (:status response)))
       (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
   (t/testing "create without file_data"
     (let [test-doc (assoc test-document :file_data nil)
-          body (.getBytes (json/write-str test-doc))
+          body (.getBytes (json/generate-string test-doc))
           response (h/create-document test-ds {:body body})]
       (t/is (= 400 (:status response)))
       (t/is (= "{\"result\":" (subs (:body response) 0 10))))))
@@ -69,7 +69,7 @@
 
 (t/deftest get-document
   (t/testing "create and then get single file with data"
-    (let [body (.getBytes (json/write-str test-document))
+    (let [body (.getBytes (json/generate-string test-document))
           create-resp (h/create-document test-ds {:body body})
           id (:id (response->document create-resp))
           get-resp (h/get-document test-ds id true)
@@ -84,7 +84,7 @@
 
 (t/deftest get-documents
   (t/testing "create and then get files"
-    (let [body (.getBytes (json/write-str test-document))
+    (let [body (.getBytes (json/generate-string test-document))
           _ (h/create-document test-ds {:body body})
           response (h/get-documents-json test-ds 10)
           get-body (response->document response)]
@@ -97,7 +97,7 @@
 
 (t/deftest get-info
   (t/testing "create and then get file info as json"
-    (let [body (.getBytes (json/write-str test-document))
+    (let [body (.getBytes (json/generate-string test-document))
           create-resp (h/create-document test-ds {:body body})
           id (:id (response->document create-resp))
           get-resp (h/get-document test-ds id false)
@@ -105,34 +105,34 @@
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status get-resp)))
       (t/is (= (:file_name test-document) (:file_name document)))
-      (t/is (= (:mime_type test-document)(:mime_type document)))
+      (t/is (= (:mime_type test-document) (:mime_type document)))
       (t/is (not (empty? (:id document))))
       (t/is (not (empty? (:created document)))))))
 
-(t/deftest delete-test
-  (t/testing "create and then delete single file"
-    (let [body (.getBytes (json/write-str test-document))
+(t/deftest close-test
+  (t/testing "create and then close single file"
+    (let [body (.getBytes (json/generate-string test-document))
           create-resp (h/create-document test-ds {:body body})
           id (:id (response->document create-resp))
-          delete-resp (h/delete-document test-ds id)]
+          close-resp (h/close-document test-ds id)]
       (t/is (= 200 (:status create-resp)))
-      (t/is (= 200 (:status delete-resp)))
-      (t/is (= "{\"result\":\"success\"}" (:body delete-resp)))))
+      (t/is (= 200 (:status close-resp)))
+      (t/is (= "{\"result\":\"success\"}" (:body close-resp)))))
   (t/testing "try to update non-existing document"
-    (let [resp (h/delete-document test-ds "non-existing-id")]
+    (let [resp (h/close-document test-ds "non-existing-id")]
       (t/is (= 400 (:status resp)))
       (t/is (= "{\"result\":" (subs (:body resp) 0 10))))))
 
 (t/deftest update-test
   (t/testing "create and then update single file"
-    (let [body1 (.getBytes (json/write-str test-document))
+    (let [body1 (.getBytes (json/generate-string test-document))
           response1 (h/create-document test-ds {:body body1})
           id1 (:id (response->document response1))
           original (response->document (h/get-document test-ds id1 true))
-          body2 (.getBytes (json/write-str test-document2))
+          body2 (.getBytes (json/generate-string test-document2))
           response2 (h/update-document test-ds id1 {:body body2})
           updated (response->document (h/get-document test-ds (:id original) true))]
-      (t/is (= true (contains? (json/read-str (:body response1)) "id")))
+      (t/is (= true (contains? (json/parse-string (:body response1)) "id")))
       (t/is (= "{\"result\":\"success\"}" (:body response2)))
       (t/is (= 200 (:status response1)))
       (t/is (= 200 (:status response2)))
@@ -145,6 +145,6 @@
       (t/is (not= (count (:file_data original)) (count (:file_data updated))))))
   (t/testing "try to update non-existing document"
     (let [resp (h/update-document test-ds "non-existing-id"
-                                  {:body (.getBytes (json/write-str test-document))})]
+                                  {:body (.getBytes (json/generate-string test-document))})]
       (t/is (= 400 (:status resp)))
       (t/is (= "{\"result\":" (subs (:body resp) 0 10))))))

@@ -55,8 +55,8 @@
   (routes
    (GET "/admin" request (if (admin? request) (admin/main ds config) access-denied))
    (POST "/admin/upload" request (if (admin? request) (admin/upload ds request) access-denied))
-   (GET "/admin/delete/:id" [id :as request] (if (admin? request) (admin/delete ds id) access-denied))
-   (GET "/admin/undelete/:id" [id :as request] (if (admin? request) (admin/undelete ds id) access-denied))
+   (GET "/admin/close/:id" [id :as request] (if (admin? request) (admin/close ds id) access-denied))
+   (GET "/admin/open/:id" [id :as request] (if (admin? request) (admin/open ds id) access-denied))
    (GET "/admin/download/:id" [id :as request] (if (admin? request) (admin/download ds id) access-denied))
    (GET "/admin/details/:id" [id :as request] (if (admin? request) (admin/details ds id) access-denied))
    (GET "/admin/shutdown" request (if (admin? request) (stop) access-denied))))
@@ -65,7 +65,7 @@
   (routes
    (GET "/api/files/:id" [id] (h/get-document ds id true))
    (PUT "/api/files/:id" [id :as request] (h/update-document ds id request))
-   (DELETE "/api/files/:id" [id] (h/delete-document ds id))
+   (DELETE "/api/files/:id" [id] (h/close-document ds id))
    (GET "/api/files" [limit] (h/get-documents-json ds limit))
    (POST "/api/files" request (h/create-document ds request))))
 

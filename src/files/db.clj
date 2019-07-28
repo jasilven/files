@@ -4,13 +4,13 @@
             [jdbc.pool.c3p0 :as pool]
             [next.jdbc.sql :as sql]
             [next.jdbc.result-set  :as rs]
-            [clojure.data.json :as json]))
+            [cheshire.core :as json]))
 
 (def files-table-create ["
 CREATE TABLE files (id VARCHAR(36) PRIMARY KEY,
   created TIMESTAMP NOT NULL,
   updated TIMESTAMP,
-  deleted TIMESTAMP,
+  closed TIMESTAMP,
   mime_type VARCHAR NOT NULL,
   file_name VARCHAR NOT NULL,
   file_data TEXT NOT NULL,
@@ -26,11 +26,12 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   userid VARCHAR(100) NOT NULL
   )"])
 
-(def fields-except-file_data "id,created,updated,deleted,mime_type,file_name,file_size,category,metadata")
+(def fields-except-file_data "id,created,updated,closed,mime_type,file_name,file_size,category,metadata")
 (def files-table-drop ["DROP TABLE files, auditlog cascade"])
 
 (def DEFAULT-QUERY-LIMIT 100) ;; default query limit
 (def MAX-QUERY-LIMIT 1000)    ;; max query limit
+(def next-opts {:builder-fn rs/as-unqualified-maps})
 
 (defn map->pgjson
   "Converts map to postgres JSON object to allow saving it correctly into db"
@@ -38,7 +39,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   (let [pgo (PGobject.)]
     (doto pgo
       (.setType "json")
-      (.setValue (json/write-str m)))
+      (.setValue (json/generate-string m)))
     pgo))
 
 ;; Provide support for postgres native JSON data type
@@ -48,21 +49,20 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
     (let [type (.getType pgo)
           value (.getValue pgo)]
       (case type
-        "json" (json/read-str value)
+        "json" (json/parse-string value true)
         :else value)))
   (read-column-by-index ^clojure.lang.IPersistentMap [^PGobject pgo _2 _3]
     (let [type (.getType pgo)
           value (.getValue pgo)]
       (case type
-        "json" (json/read-str value :key-fn keyword)
+        "json" (json/parse-string value true)
         :else value)))
 
   java.sql.Timestamp
   (read-column-by-label ^java.time.Instant [^java.sql.Timestamp v _]
     (.toInstant v))
   (read-column-by-index ^java.time.Instant [^java.sql.Timestamp v _2 _3]
-    (.toInstant v))
-  )
+    (.toInstant v)))
 ;; (extend-protocol p/SettableParameter
 ;;   PGobject
 ;;   (read-column-by-label ^clojure.lang.IPersistentMap [^PGobject pgo _]
@@ -110,13 +110,13 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
 (defn db-connection?
   "Datasource connection test. Return true if db connection exists else false."
   [ds]
-  (try (jdbc/execute-one! ds ["SELECT COUNT(1+1)"]) true
+  (try (jdbc/execute-one! ds ["SELECT COUNT(1+1)"] next-opts) true
        (catch Exception e false)))
 
 (defn files-exists?
   "Return true if files table exists or else false."
   [ds]
-  (try (jdbc/execute-one! ds ["SELECT COUNT (*) FROM files"]) true
+  (try (jdbc/execute-one! ds ["SELECT COUNT (*) FROM files"] next-opts) true
        (catch Exception e false)))
 
 (defn create-files-table
@@ -144,7 +144,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
 (defn auditlog!
   "Write audit log entry {:fileid :created :userid :event}. Throws if error."
   [tx entry]
-  (sql/insert! tx :auditlog entry))
+  (sql/insert! tx :auditlog entry next-opts))
 
 (defn create-document
   "Create document and return id of created document as map. Throws if error."
@@ -156,7 +156,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
                    :created ts
                    :file_size (count (:file_data document)))]
     (jdbc/with-transaction [tx ds]
-      (let [result (sql/insert! tx :files doc {:return-keys ["id"]})]
+      (let [result (sql/insert! tx :files doc (merge {:return-keys ["id"]} next-opts))]
         (auditlog! tx {:fileid (:id doc) :created ts :userid "unknown" :event "create"})
         result))))
 
@@ -164,46 +164,46 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   "Update document and return true on success. Throws if error."
   [ds id document]
   (let [ts (timestamp)
-        doc (assoc (dissoc document :id :created :deleted)
+        doc (assoc (dissoc document :id :created :closed)
                    :metadata (map->pgjson (:metadata document))
                    :updated ts
                    :file_size (count (:file_data document)))]
     (jdbc/with-transaction [tx ds]
-      (let [result (sql/update! tx :files doc {:id id})]
+      (let [result (sql/update! tx :files doc {:id id} next-opts)]
         (when (zero? (:next.jdbc/update-count result))
           (ex-info "document update failed, maybe non-existing document" {:id id :document document}))
         (auditlog! tx {:fileid id :created ts :userid "unknown" :event "update"})
         true))))
 
-(defn delete-document
-  "Mark document deleted with timestamp and return true on success and false
-  if document already deleted. Throws if error."
+(defn close-document
+  "Mark document closed with timestamp and return true on success and false
+  if document already closed. Throws if error."
   [ds id]
-  (let [doc (jdbc/execute-one! ds ["SELECT deleted FROM files WHERE id = ?" id])]
-    (when (nil? doc) (throw (ex-info "cannot delete, document not found" {:id id})))
-    (if (nil? (:files/deleted doc))
+  (let [doc (jdbc/execute-one! ds ["SELECT closed FROM files WHERE id = ?" id] next-opts)]
+    (when (nil? doc) (throw (ex-info "cannot close, document not found" {:id id})))
+    (if (nil? (:closed doc))
       (jdbc/with-transaction [tx ds]
         (let [ts (timestamp)
-              result (sql/update! tx :files {:deleted ts} {:id id})]
+              result (sql/update! tx :files {:closed ts} {:id id} next-opts)]
           (when (zero? (:next.jdbc/update-count result))
-            (ex-info "document delete failed" {:id id :document doc}))
-          (auditlog! tx {:fileid id :created ts :userid "unknown" :event "delete"})
+            (ex-info "document close failed" {:id id :document doc}))
+          (auditlog! tx {:fileid id :created ts :userid "unknown" :event "close"})
           true))
       false)))
 
-(defn undelete-document
-  "Undelete document by setting deleted timestamp nil and return true on success and false
-  if document already undeleted. Throws if error."
+(defn open-document
+  "open document by setting closed timestamp nil and return true on success and false
+  if document already open. Throws if error."
   [ds id]
-  (let [doc (jdbc/execute-one! ds ["SELECT deleted FROM files WHERE id = ?" id])]
-    (when (nil? doc) (throw (ex-info "cannot undelete, document not found" {:id id})))
-    (if-not (nil? (:files/deleted doc))
+  (let [doc (jdbc/execute-one! ds ["SELECT closed FROM files WHERE id = ?" id] next-opts)]
+    (when (nil? doc) (throw (ex-info "cannot open, document not found or already open" {:id id})))
+    (if-not (nil? (:closed doc))
       (jdbc/with-transaction [tx ds]
         (let [ts (timestamp)
-              result (sql/update! tx :files {:deleted nil} {:id id})]
+              result (sql/update! tx :files {:closed nil} {:id id} next-opts)]
           (when (zero? (:next.jdbc/update-count result))
-            (ex-info "document undelete failed" {:id id :document doc}))
-          (auditlog! tx {:fileid id :created ts :userid "unknown" :event "undelete"})
+            (ex-info "document open failed" {:id id :document doc}))
+          (auditlog! tx {:fileid id :created ts :userid "unknown" :event "open"})
           true))
       false)))
 
@@ -214,7 +214,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   ([ds limit]
    (if (pos-int? limit)
      (sql/query ds [(str "SELECT " fields-except-file_data " FROM files ORDER BY created DESC LIMIT ?")
-                    (min limit MAX-QUERY-LIMIT)])
+                    (min limit MAX-QUERY-LIMIT)] next-opts)
      (throw (ex-info "invalid parameter value for limit" {:limit limit})))))
 
 (defn get-document
@@ -223,8 +223,8 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   (jdbc/with-transaction [tx ds]
     (let [ts (timestamp)
           result (if binary?
-                   (sql/get-by-id tx :files id)
-                   (jdbc/execute-one! tx [(str "SELECT " fields-except-file_data " FROM files WHERE id = ?") id]))]
+                   (sql/get-by-id tx :files id next-opts)
+                   (jdbc/execute-one! tx [(str "SELECT " fields-except-file_data " FROM files WHERE id = ?") id] next-opts))]
       (when-not (nil? result) (auditlog! tx {:fileid id :created ts :userid "unknown" :event "read"}))
       result)))
 
@@ -236,5 +236,5 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
    (if (pos-int? limit)
      (sql/query ds ["SELECT * FROM auditlog WHERE fileid = ? ORDER BY created DESC LIMIT ?"
                     fileid
-                    (min limit MAX-QUERY-LIMIT)])
+                    (min limit MAX-QUERY-LIMIT)] next-opts)
      (throw (ex-info "invalid parameter value for limit" {:limit limit})))))

@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>files API</title>
-    <link rel="stylesheet" type="text/css" href="css/swagger-ui.css">
-  </head>
-  <body>
-    <script src="css/swagger-ui-bundle.js"></script>
-    <script src="css/swagger-ui-standalone-preset.js"></script>
-    <script>
-      window.onload = function() {
-          const ui = SwaggerUIBundle({
-              url: "https://localhost:8080/swagger.json",
-              dom_id: '#swagger-ui',
-              presets: [
-                  SwaggerUIBundle.presets.apis,
-                  SwaggerUIStandalonePreset
-              ],
-              layout: "StandaloneLayout"
-          })
-          window.ui = ui
-      }
-    </script>
-    <div id="swagger-ui"></div>
-  </body>
+
+<head>
+  <meta charset="utf-8">
+  <title>files API</title>
+  <link rel="stylesheet" type="text/css" href="css/swagger-ui.css">
+</head>
+
+<body>
+  <script src="css/swagger-ui-bundle.js"></script>
+  <script src="css/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function () {
+      const ui = SwaggerUIBundle({
+        url: "https://localhost:8080/swagger.yaml",
+        dom_id: '#swagger-ui',
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "StandaloneLayout"
+      })
+      window.ui = ui
+    }
+  </script>
+  <div id="swagger-ui"></div>
+</body>
+
 </html>
