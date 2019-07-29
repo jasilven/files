@@ -7,7 +7,7 @@
     (t/is (= 200 (:status (app {:uri "/" :request-method :get}))))
     (t/is (= "text/html" (get-in (app {:uri "/" :request-method :get}) [:headers "Content-Type"])))
     (t/is (= 200 (:status (app {:uri "/swagger" :request-method :get}))))
-    (t/is (= 200 (:status (app {:uri "/swagger.json" :request-method :get}))))
+    (t/is (= 200 (:status (app {:uri "/swagger.yaml" :request-method :get}))))
     (t/is (= 200 (:status (app {:uri "/index.html" :request-method :get}))))))
 
 (t/deftest api-auth-routing

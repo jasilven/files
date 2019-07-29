@@ -1,25 +1,26 @@
 (ns files-client
   (:import java.util.Base64)
   (:require [clj-http.client :as client]
+            [files.b64 :as b64]
             [clojure.java.io :as io]
             [cheshire.core :as json]))
 
 (def api-uri "https://localhost:8080/api/files")
 (def auth-options {:basic-auth ["apiuser" "1234"] :insecure? true})
 
-(defn encode-b64 [barray]
-  (String. (.encode (Base64/getEncoder) barray) "UTF-8"))
+; (defn encode-b64 [barray]
+;   (String. (.encode (Base64/getEncoder) barray) "UTF-8"))
 
-(defn decode-b64 [s]
-  (.decode (Base64/getDecoder) s))
+; (defn decode-b64 [s]
+;   (.decode (Base64/getDecoder) s))
 
-(defn file->bytes
-  "open fname as file and return bytes"
-  [fname]
-  (with-open [xin (io/input-stream (io/file fname))
-              xout (java.io.ByteArrayOutputStream.)]
-    (io/copy xin xout)
-    (.toByteArray xout)))
+; (defn file->bytes
+;   "open fname as file and return bytes"
+;   [fname]
+;   (with-open [xin (io/input-stream (io/file fname))
+;               xout (java.io.ByteArrayOutputStream.)]
+;     (io/copy xin xout)
+;     (.toByteArray xout)))
 
 (def metadata {:title "lorem ipsum dolor"
                :owner "Gene Roddenberry"
@@ -35,12 +36,12 @@
 
 (def pdf-document (json/generate-string {:file_name "testfile.pdf"
                                          :mime_type "application/pdf"
-                                         :file_data (encode-b64 (file->bytes "test/testfile.pdf"))
+                                         :file_data (b64/encode-file "test/testfile.pdf")
                                          :metadata metadata}))
 
 (def jpg-document (json/generate-string {:file_name "testfile.jpg"
                                          :mime_type "image/jpg"
-                                         :file_data (encode-b64 (file->bytes "test/testfile.jpg"))
+                                         :file_data (b64/encode-file "test/testfile.jpg")
                                          :metadata metadata}))
 
 (defn spy [x] (println x) x)
@@ -81,7 +82,7 @@
   [id fname]
   (-> (get-document id)
       :file_data
-      (decode-b64)
+      (b64/decode)
       (clojure.java.io/copy (java.io.File. fname))))
 
 (defn generate-documents

@@ -29,9 +29,9 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
 (def fields-except-file_data "id,created,updated,closed,mime_type,file_name,file_size,category,metadata")
 (def files-table-drop ["DROP TABLE files, auditlog cascade"])
 
-(def DEFAULT-QUERY-LIMIT 100) ;; default query limit
-(def MAX-QUERY-LIMIT 1000)    ;; max query limit
-(def next-opts {:builder-fn rs/as-unqualified-maps})
+(def DEFAULT-QUERY-LIMIT 100) ;; default query limit for files query
+(def MAX-QUERY-LIMIT 1000)    ;; max query limit for files query
+(def next-opts {:builder-fn rs/as-unqualified-maps}) ;; drop namespace
 
 (defn map->pgjson
   "Converts map to postgres JSON object to allow saving it correctly into db"
@@ -42,7 +42,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
       (.setValue (json/generate-string m)))
     pgo))
 
-;; Provide support for postgres native JSON data type
+;; Conversions from postgres JSON data type to EDN and java.sql.Timestamp to Instant 
 (extend-protocol rs/ReadableColumn
   PGobject
   (read-column-by-label ^clojure.lang.IPersistentMap [^PGobject pgo _]
@@ -57,32 +57,11 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
       (case type
         "json" (json/parse-string value true)
         :else value)))
-
   java.sql.Timestamp
   (read-column-by-label ^java.time.Instant [^java.sql.Timestamp v _]
     (.toInstant v))
   (read-column-by-index ^java.time.Instant [^java.sql.Timestamp v _2 _3]
     (.toInstant v)))
-;; (extend-protocol p/SettableParameter
-;;   PGobject
-;;   (read-column-by-label ^clojure.lang.IPersistentMap [^PGobject pgo _]
-;;     (let [type (.getType pgo)
-;;           value (.getValue pgo)]
-;;       (case type
-;;         "json" (json/read-str value)
-;;         :else value)))
-;;   (read-column-by-index ^clojure.lang.IPersistentMap [^PGobject pgo _2 _3]
-;;     (let [type (.getType pgo)
-;;           value (.getValue pgo)]
-;;       (case type
-;;         "json" (json/read-str value)
-;;         :else value)))
-;; java.sql.Timestamp
-;; (read-column-by-label ^java.time.Instant [^java.sql.Timestamp v _]
-;;   (.toInstant v))
-;; (read-column-by-index ^java.time.Instant [^java.sql.Timestamp v _2 _3]
-;;   (.toInstant v))
-;; )
 
 (defn uuid
   "Return new UUID as string or convert s to UUID. Throws if error."
@@ -130,16 +109,6 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   "Drop files table and return true. Throws if error."
   [ds]
   (jdbc/execute! ds files-table-drop))
-
-;; (defn create-document
-;;   "Create document and return id of created document as map. Throws if error."
-;;   [ds document]
-;;   (let [meta (map->pgjson (:metadata document))
-;;         id (uuid)
-;;         ts (timestamp)
-;;         size (count (:file_data document))]
-;;     (sql/insert! ds :files (assoc document :id id :created ts :file_size size :metadata meta)
-;;                  {:return-keys ["id"]})))
 
 (defn auditlog!
   "Write audit log entry {:fileid :created :userid :event}. Throws if error."
@@ -192,11 +161,11 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
       false)))
 
 (defn open-document
-  "open document by setting closed timestamp nil and return true on success and false
+  "Open document by setting closed timestamp nil. Return true on success and false
   if document already open. Throws if error."
   [ds id]
   (let [doc (jdbc/execute-one! ds ["SELECT closed FROM files WHERE id = ?" id] next-opts)]
-    (when (nil? doc) (throw (ex-info "cannot open, document not found or already open" {:id id})))
+    (when (nil? doc) (throw (ex-info "cannot open, document not found" {:id id})))
     (if-not (nil? (:closed doc))
       (jdbc/with-transaction [tx ds]
         (let [ts (timestamp)
@@ -229,8 +198,8 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
       result)))
 
 (defn get-auditlogs
-  "Return vector of log entries up to limit or
-  up to MAX-QUERY-LIMIT if limit is greater than MAX-QUERY-LIMIT. Throws if error."
+  "Return vector of log entries up to limit or up to MAX-QUERY-LIMIT 
+  if limit is greater than MAX-QUERY-LIMIT. Throws if error."
   ([ds fileid] (get-auditlogs ds fileid DEFAULT-QUERY-LIMIT))
   ([ds fileid limit]
    (if (pos-int? limit)

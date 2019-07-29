@@ -12,7 +12,12 @@
   []
   [:nav {:class "navbar" :style "background-color: #990AE3;"}
    [:a {:class "navbar-brand font-weight-bold" :style "color: #ffffff;" :href "/admin"} "Files"]
-   [:a {:class "navbar font-weight-bold" :style "color: #dddddd;" :href "/admin/shutdown"} "Shutdown"]])
+   [:ul {:class "nav mr-auto"}
+    [:li {:class "nav-item"}
+     [:a {:class "nav-link" :style "color: #eeeeee;" :href "/swagger"} "Swagger"]]]
+   [:ul {:class "nav justify-content-end"}
+    [:li {:class "nav-item"}
+     [:a {:class "btn btn-light" :style "colorss: #dddddd;" :href "/admin/shutdown"} "Shutdown"]]]])
 
 (defn auditlog
   "Render auditlog."
@@ -45,7 +50,7 @@
         [:td (:created document)]]
        [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Updated:"]
         [:td (:updated document)]]
-       [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "closed:"]
+       [:tr [:td {:class "font-weight-bolder" :style "text-align: right"} "Closed:"]
         [:td (:closed document)]]]
       [:a {:class "badge badge-primary jml-3" :href (str "/admin/download/" (:id document))} "download"]
       [:a {:class "badge badge-info ml-3" :href (str "/api/files/" (:id document))} "json"]
@@ -81,6 +86,28 @@
         [:h4 "Info"]
         [:pre info]]]]]))
 
+(defn configuration
+  "Render configuration details"
+  [config]
+  [:div {:class "card border-light"}
+   [:div {:class "card-header"} "Database Configuration"]
+   [:div {:class "card-body pb-0"}
+    [:pre "db: " (get-in config [:db-pool :subprotocol])
+     "\nuri: " (get-in config [:db-pool :subname])
+     "\npool min: " (get-in config [:db-pool :min-pool-size])
+     "\npool max: " (get-in config [:db-pool :max-pool-size])]]])
+
+(defn upload-form
+  "Render document upload form"
+  []
+  [:div {:class "card border-light"}
+   [:div {:class "card-header"} "Upload Document"]
+   [:div {:class "card-body"}
+    [:form {:action "/admin/upload" :method "post" :enctype "multipart/form-data"}
+     [:div {:class "form-group"}
+      [:input {:name "file" :type "file" :size "40"}]
+      [:input {:type "submit" :name "submit" :value "submit"}]]]]])
+
 (defn admin
   "Render admin main page."
   [documents config]
@@ -91,29 +118,19 @@
     (top-navi)
     [:div {:class "container-fluid mt-3"}
      [:div {:class "row"}
-      [:div {:class "col"}
-       [:h4 "Database"]
-       [:pre {:class "border"}
-        "db: " (get-in config [:db-pool :subprotocol])
-        "\nuri: " (get-in config [:db-pool :subname])
-        "\npool min: " (get-in config [:db-pool :min-pool-size])
-        "\npool max: " (get-in config [:db-pool :max-pool-size])]]
-      [:div {:class "col"}
-       [:h4 "Upload"]
-       [:form {:action "/admin/upload" :method "post" :enctype "multipart/form-data"}
-        [:div {:class "form-group"}
-         [:input {:name "file" :type "file" :size "40"}]
-         [:input {:type "submit" :name "submit" :value "submit"}]]]]]
-     [:div {:class "row"} [:div {:class "col"} [:h4 (str "Latest " (count documents) " documents")]]]
+      [:div {:class "col"} (configuration config)]
+      [:div {:class "col"} (upload-form)]]
+     [:div {:class "row text-center"}
+      [:div {:class "col pt-2"} [:h5 (str "Latest " (count documents) " documents")]]]
      [:table {:class "table table-hover"}
-      [:thead {:class "thead-light"}
+      [:thead {:class "thead-lightdd"}
        [:tr
         [:th {:scope "col"} "Filename"]
         [:th {:scope "col"} "Type"]
         [:th {:scope "col"} "Created"]
         [:th {:scope "col"} "Updated"]
-        [:th {:scope "col"} "closed"]
-        [:th {:scope "col" :class "text-right"} "File Size (KB)"]]]
+        [:th {:scope "col"} "Closed"]
+        [:th {:scope "col" :class "text-right"} "File Size (kB)"]]]
       [:tbody
        (for [d documents]
          [:tr {:onclick (str "jump('/admin/details/" (:id d) "')")}

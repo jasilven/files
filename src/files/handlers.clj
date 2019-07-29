@@ -8,16 +8,6 @@
 ;; keys that must be included in document when creating/updating
 (def required-document-keys [:file_name :mime_type :file_data])
 
-;; (extend-type java.sql.Timestamp
-;;   json/JSONWriter
-;;   (-write [date out]
-;;     (json/-write (str date) out)))
-
-;; (extend-type java.time.Instant
-;;   json/JSONWriter
-;;   (-write [date out]
-;;     (json/-write (str date) out)))
-
 ;; Instant -> JSON generator support for cheshire
 (add-encoder java.time.Instant
              (fn [c jsonGenerator]

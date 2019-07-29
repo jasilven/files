@@ -38,10 +38,7 @@
          :body (io/input-stream (b64/decode (:file_data result)))}))
     (catch Exception e (error e "file download failed"))))
 
-
 ;; TODO: add unit test
-
-
 (defn upload
   "Create new document from form upload."
   [ds request]
