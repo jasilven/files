@@ -1,4 +1,5 @@
 (ns files.core
+  (:gen-class)
   (:require [clojure.tools.logging :as log]
             [compojure.core :refer [defroutes DELETE GET PUT POST routes]]
             [compojure.route :as route]
