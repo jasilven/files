@@ -35,7 +35,7 @@
   "Gracefully shutdown the web server."
   []
   (when (some? @http-server)
-    (log/info "server shutdown in progress..")
+    (log/info "server shutdown in progress")
     (future (.stop @http-server)
             (log/info "closing db connections")
             (.close ds))
@@ -106,6 +106,9 @@
         (reset! http-server (run-jetty app (assoc (:jetty config)
                                                   :configurator configurator)))
         (error-exit "Problem with creating files table. Exiting."))
+      (.addShutdownHook (Runtime/getRuntime)
+                        (Thread. (fn [] (println "Got SIGTERM. Shutting down...")
+                                   (stop))))
       (log/info "Server started")
       (catch Exception e (error-exit e)))
     (error-exit "No DB connection. Ensure that DB is running or check configuration.")))
