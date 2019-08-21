@@ -32,14 +32,16 @@
 (defonce http-server (atom nil))
 
 (defn stop
-  "Gracefully shutdown the web server."
+  "Gracefully shutdown the web server and db connection pool."
   []
   (when (some? @http-server)
-    (log/info "server shutdown in progress")
-    (future (.stop @http-server)
-            (log/info "closing db connections")
-            (.close ds))
-    "Bye"))
+    (.start (Thread. (fn []
+                       (log/info "Server shutdown in progress.")
+                       (.stop @http-server)
+                       (log/info "Closing db connections.")
+                       (.close ds)
+                       (log/info "Server stopped."))))
+    "Shutting down"))
 
 (defn authenticate
   "Authenticate user and return authenticated user name or nil."
@@ -106,10 +108,7 @@
         (reset! http-server (run-jetty app (assoc (:jetty config)
                                                   :configurator configurator)))
         (error-exit "Problem with creating files table. Exiting."))
-      (.addShutdownHook (Runtime/getRuntime)
-                        (Thread. (fn [] (println "Got SIGTERM. Shutting down...")
-                                   (stop))))
-      (log/info "Server started")
+      (log/info "Server started.")
       (catch Exception e (error-exit e)))
     (error-exit "No DB connection. Ensure that DB is running or check configuration.")))
 
@@ -117,4 +116,5 @@
   (start)
   (stop))
 
-(defn -main [] (start))
+(defn -main []
+  (start))
