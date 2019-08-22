@@ -124,14 +124,14 @@ paths:
               properties:
                 file_name:
                   type: string
-                  example: document.pdf
+                  example: somefile.txt
                 file_data:
                   type: string
                   format: byte
                   example: ZmlsZXM=
                 mime_type:
                   type: string
-                  example: application/pdf
+                  example: text/plain
                 category:
                   type: string
                   example: offer
@@ -173,14 +173,14 @@ paths:
               properties:
                 file_name:
                   type: string
-                  example: document.pdf
+                  example: somefile.txt
                 file_data:
                   type: string
                   format: byte
                   example: ZmlsZXM=
                 mime_type:
                   type: string
-                  example: application/pdf
+                  example: text/plain
                 category:
                   type: string
                   example: contract
