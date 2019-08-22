@@ -195,8 +195,10 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
           result (if binary?
                    (sql/get-by-id tx :files id next-opts)
                    (jdbc/execute-one! tx [(str "SELECT " fields-except-file_data " FROM files WHERE id = ?") id] next-opts))]
-      (when-not (nil? result) (auditlog! tx {:fileid id :created ts :userid "unknown" :event "read"}))
-      result)))
+
+      (when-not (nil? result)
+        (auditlog! tx {:fileid id :created ts :userid "unknown" :event "read"})
+        (assoc result :metadata (json/parse-string (:metadata result) keyword))))))
 
 (defn get-auditlogs
   "Return vector of log entries up to limit or up to MAX-QUERY-LIMIT

@@ -5,20 +5,21 @@
             [clojure.java.io :as io]
             [cheshire.core :as json]))
 
-(def api-uri "https://localhost:8080/api/files")
+(def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
+;; (def api-uri "https://localhost:8080/api/files")
 (def auth-options {:basic-auth ["apiuser" "1234"] :insecure? true})
 
-(def metadata {:title "lorem ipsum dolor"
-               :owner "Gene Roddenberry"
-               :creator "Ian Fleming"
-               :type "agreement"
-               :date "2020-12-12"
-               :status "draft"
-               :version 3
-               :sensitivity "normal"
-               :importance "urgent"
-               :customerID "A-95878649"
-               :sector "B2O"})
+(def metadata (json/generate-string {:title "lorem ipsum dolor"
+                                     :owner "Gene Roddenberry"
+                                     :creator "Ian Fleming"
+                                     :type "agreement"
+                                     :date "2020-12-12"
+                                     :status "draft"
+                                     :version 3
+                                     :sensitivity "normal"
+                                     :importance "urgent"
+                                     :customerID "A-95878649"
+                                     :sector "B2O"}))
 
 (def pdf-document (json/generate-string {:file_name "testfile.pdf"
                                          :mime_type "application/pdf"
@@ -29,7 +30,6 @@
                                          :mime_type "image/jpg"
                                          :file_data (b64/encode-file "test/testfile.jpg")
                                          :metadata metadata}))
-
 (defn spy [x] (println x) x)
 
 (defn post-document
@@ -108,7 +108,7 @@
     (write-document id "out.jpg"))
 
   ;; generate n documents
-  (time (generate-documents [pdf-document jpg-document] 100))
+  (time (generate-documents [pdf-document jpg-document] 10))
 
   ;; randomly update all documents
   (update-documents [pdf-document jpg-document])
