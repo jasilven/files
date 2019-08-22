@@ -4,6 +4,7 @@
             [files.b64 :as b64]
             [clojure.tools.logging :as log]
             [files.db :as db]
+            [cheshire.core :as json]
             [ring.util.response :refer [redirect]]
             [hiccup.core :refer [html]]))
 
@@ -59,7 +60,9 @@
   "Render document details."
   [ds id]
   (try
-    (let [document (db/get-document ds id false)]
+    (let [document (db/get-document ds id false)
+          document (assoc document :metadata
+                          (json/parse-string (:metadata document) keyword))]
       (if (nil? document)
         (throw (ex-info "document not found" {:id id}))
         (ok (views/details document (db/get-auditlogs ds id DEFAULT-LOG-LIMIT)))))

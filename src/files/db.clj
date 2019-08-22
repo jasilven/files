@@ -42,7 +42,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
       (.setValue (json/generate-string m)))
     pgo))
 
-;; Conversions from postgres JSON data type to EDN and java.sql.Timestamp to Instant 
+;; Conversions from postgres JSON data type to EDN and java.sql.Timestamp to Instant
 (extend-protocol rs/ReadableColumn
   PGobject
   (read-column-by-label ^clojure.lang.IPersistentMap [^PGobject pgo _]
@@ -123,7 +123,8 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
                    :id (uuid)
                    :metadata (map->pgjson (:metadata document))
                    :created ts
-                   :file_size (count (:file_data document)))]
+                   :file_size (.length (:file_data document)))]
+
     (jdbc/with-transaction [tx ds]
       (let [result (sql/insert! tx :files doc (merge {:return-keys ["id"]} next-opts))]
         (auditlog! tx {:fileid (:id doc) :created ts :userid "unknown" :event "create"})
@@ -198,7 +199,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
       result)))
 
 (defn get-auditlogs
-  "Return vector of log entries up to limit or up to MAX-QUERY-LIMIT 
+  "Return vector of log entries up to limit or up to MAX-QUERY-LIMIT
   if limit is greater than MAX-QUERY-LIMIT. Throws if error."
   ([ds fileid] (get-auditlogs ds fileid DEFAULT-QUERY-LIMIT))
   ([ds fileid limit]

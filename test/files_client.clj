@@ -8,20 +8,6 @@
 (def api-uri "https://localhost:8080/api/files")
 (def auth-options {:basic-auth ["apiuser" "1234"] :insecure? true})
 
-; (defn encode-b64 [barray]
-;   (String. (.encode (Base64/getEncoder) barray) "UTF-8"))
-
-; (defn decode-b64 [s]
-;   (.decode (Base64/getDecoder) s))
-
-; (defn file->bytes
-;   "open fname as file and return bytes"
-;   [fname]
-;   (with-open [xin (io/input-stream (io/file fname))
-;               xout (java.io.ByteArrayOutputStream.)]
-;     (io/copy xin xout)
-;     (.toByteArray xout)))
-
 (def metadata {:title "lorem ipsum dolor"
                :owner "Gene Roddenberry"
                :creator "Ian Fleming"
