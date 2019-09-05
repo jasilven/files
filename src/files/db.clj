@@ -137,7 +137,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
         doc (assoc (dissoc document :id :created :closed)
                    :metadata (map->pgjson (:metadata document))
                    :updated ts
-                   :file_size (count (:file_data document)))]
+                   :file_size (.length (:file_data document)))]
     (jdbc/with-transaction [tx ds]
       (let [result (sql/update! tx :files doc {:id id} next-opts)]
         (when (zero? (:next.jdbc/update-count result))

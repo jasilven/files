@@ -53,6 +53,12 @@
           response (h/create-document test-ds {:body body})]
       (t/is (= 400 (:status response)))
       (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+  (t/testing "create with empty required field"
+    (let [test-doc (assoc test-document :file_data "")
+          body (.getBytes (json/generate-string test-doc))
+          response (h/create-document test-ds {:body body})]
+      (t/is (= 400 (:status response)))
+      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
   (t/testing "create without file_data"
     (let [test-doc (assoc test-document :file_data nil)
           body (.getBytes (json/generate-string test-doc))
