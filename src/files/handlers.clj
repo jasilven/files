@@ -25,8 +25,9 @@
 (defn json-error
   "Return error response as json and write msg to log."
   [code exp msg]
-  (log/error exp msg (ex-data exp))
-  (json-response code {:result msg}))
+  (let [error-key (format "%x" (.hashCode (java.time.Instant/now)))]
+    (log/error exp msg (assoc (ex-data exp) :error-key error-key))
+    (json-response code {:result (str msg ", error-key: " error-key)})))
 
 (defn get-documents
   "Return documents as vector. Throws if error."
@@ -59,16 +60,28 @@
   (every? #(and (contains? document %)
                 (not-empty (get document %))) required-document-keys))
 
+(defn valid-json?
+  "Returns true if input is nil or valid json, false otherwise."
+  [input]
+  (if (nil? input)
+    true
+    (try (json/parse-string input)
+         true
+         (catch Exception e false))))
+
 (defn create-document
   "Create document and return id as json response."
   [ds request]
   (try
-    (let [document (json/parse-string (slurp (:body request)) true)]
-      (if (required-keys-ok? document)
-        (json-ok (db/create-document ds document))
-        (throw (ex-info "required field missing/empty" {:request request
-                                                        :required-keys required-document-keys}))))
-    (catch Exception e (json-error 400 e "document creation failed"))))
+    (let [document (json/parse-string (slurp (:body request)) true)
+          metadata (:metadata document)]
+      (if-not (required-keys-ok? document)
+        (throw (ex-info "required key missing" {:document-keys (keys document)
+                                                :required-keys required-document-keys})))
+      (if-not (valid-json? metadata)
+        (throw (ex-info "invalid JSON in metadata" {:metadata metadata})))
+      (json-ok (db/create-document ds document)))
+    (catch Exception e (json-error 400 e (str "document creation failed: " (.getMessage e))))))
 
 (defn close-document
   "close document and return close count as json response."

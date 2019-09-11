@@ -141,7 +141,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
     (jdbc/with-transaction [tx ds]
       (let [result (sql/update! tx :files doc {:id id} next-opts)]
         (when (zero? (:next.jdbc/update-count result))
-          (ex-info "document update failed, maybe non-existing document" {:id id :document document}))
+          (throw (ex-info "document update failed, maybe non-existing document" {:id id :document document})))
         (auditlog! tx {:fileid id :created ts :userid "unknown" :event "update"})
         true))))
 
@@ -156,7 +156,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
         (let [ts (timestamp)
               result (sql/update! tx :files {:closed ts} {:id id} next-opts)]
           (when (zero? (:next.jdbc/update-count result))
-            (ex-info "document close failed" {:id id :document doc}))
+            (throw (ex-info "document close failed" {:id id :document doc})))
           (auditlog! tx {:fileid id :created ts :userid "unknown" :event "close"})
           true))
       false)))
@@ -172,7 +172,7 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
         (let [ts (timestamp)
               result (sql/update! tx :files {:closed nil} {:id id} next-opts)]
           (when (zero? (:next.jdbc/update-count result))
-            (ex-info "document open failed" {:id id :document doc}))
+            (throw (ex-info "document open failed" {:id id :document doc})))
           (auditlog! tx {:fileid id :created ts :userid "unknown" :event "open"})
           true))
       false)))
@@ -183,8 +183,9 @@ CREATE TABLE auditlog (id SERIAL PRIMARY KEY,
   ([ds] (get-documents ds DEFAULT-QUERY-LIMIT))
   ([ds limit]
    (if (pos-int? limit)
-     (sql/query ds [(str "SELECT " fields-except-file_data " FROM files ORDER BY created DESC LIMIT ?")
-                    (min limit MAX-QUERY-LIMIT)] next-opts)
+     (->> (sql/query ds [(str "SELECT " fields-except-file_data " FROM files ORDER BY created DESC LIMIT ?")
+                         (min limit MAX-QUERY-LIMIT)] next-opts)
+          (mapv #(assoc % :metadata (json/parse-string (:metadata %)))))
      (throw (ex-info "invalid parameter value for limit" {:limit limit})))))
 
 (defn get-document

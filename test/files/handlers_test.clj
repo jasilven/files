@@ -6,6 +6,7 @@
             [files.handlers :as h]))
 
 (def test-ds (db/get-datasource (read-string (slurp "config_test.edn"))))
+
 (def test-document {:file_name "test/testfile.pdf"
                     :mime_type "application/pdf"
                     :file_data (b64/encode-file "test/testfile.pdf")})
@@ -13,6 +14,11 @@
 (def test-document2 {:file_name "test/testfile.jpg"
                      :mime_type "image/jpg"
                      :file_data (b64/encode-file "test/testfile.jpg")})
+
+(def test-invalid-document {:file_name "test/testfile.jpg"
+                            :mime_type "image/jpg"
+                            :file_data (b64/encode-file "test/testfile.jpg")
+                            :metadata "invalid metadata"})
 
 (defn response->document
   "parse document from http response to document edn"
@@ -66,12 +72,27 @@
       (t/is (= 400 (:status response)))
       (t/is (= "{\"result\":" (subs (:body response) 0 10))))))
 
-(t/deftest create-test-illegal-json
+(t/deftest create-invalid-document
   (t/testing "create with incorrect json in metadata"
     (let [test-body "{\"file_name\":\"testfile.pdf\",\"mime_type\":\"Y\",\"file_data\":\"Z\",\"metadata\":{\"zs}\"}"
           response (h/create-document test-ds {:body (.getBytes test-body)})]
       (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10))))))
+      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+  (t/testing "create with empty metadata"
+    (let [test-body "{\"file_name\":\"testfile.pdf\",\"mime_type\":\"Y\",\"file_data\":\"Z\",\"metadata\":\"}"
+          response (h/create-document test-ds {:body (.getBytes test-body)})]
+      (t/is (= 400 (:status response)))
+      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+  (t/testing "create with invalid metadata"
+    (let [test-body "{\"file_name\":\"testfile.pdf\",\"mime_type\":\"Y\",\"file_data\":\"Z\",\"metadata\":invalid\"}"
+          response (h/create-document test-ds {:body (.getBytes test-body)})]
+      (t/is (= 400 (:status response)))
+      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+  (t/testing "create document with invalid metadata"
+    (let [body (.getBytes (json/generate-string test-invalid-document))
+          response (h/create-document test-ds {:body body})]
+      (t/is (= 400 (:status response)))
+      (t/is (= {"Content-Type" "application/json"} (:headers response))))))
 
 (t/deftest get-document
   (t/testing "create and then get single file with data"
