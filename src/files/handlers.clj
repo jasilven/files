@@ -66,8 +66,8 @@
     (let [document (json/parse-string (slurp (:body request)) true)]
       (if (required-keys-ok? document)
         (json-ok (db/create-document ds document))
-        (throw (ex-info "cannot create document, required field missing" {:request request
-                                                                          :required-keys required-document-keys}))))
+        (throw (ex-info "required field missing/empty" {:request request
+                                                        :required-keys required-document-keys}))))
     (catch Exception e (json-error 400 e "document creation failed"))))
 
 (defn close-document
@@ -88,7 +88,7 @@
         (if (db/update-document ds id document)
           (json-ok {:result "success"})
           (throw (ex-info "cannot update, maybe non-existing document" {:id id})))
-        (throw (ex-info "required field missing" {:id id
-                                                  :request request
-                                                  :required-keys required-document-keys}))))
+        (throw (ex-info "required field missing/empty" {:id id
+                                                        :request request
+                                                        :required-keys required-document-keys}))))
     (catch Exception e (json-error 400 e "document update failed"))))
