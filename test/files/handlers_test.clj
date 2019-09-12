@@ -174,4 +174,12 @@
     (let [resp (h/update-document test-ds "non-existing-id"
                                   {:body (.getBytes (json/generate-string test-document))})]
       (t/is (= 400 (:status resp)))
+      (t/is (= "{\"result\":" (subs (:body resp) 0 10)))))
+  (t/testing "try to update non-valid document"
+    (let [body (.getBytes (json/generate-string test-document))
+          response (h/create-document test-ds {:body body})
+          id (:id (response->document response))
+          resp (h/update-document test-ds id
+                                  {:body (.getBytes (json/generate-string test-invalid-document))})]
+      (t/is (= 400 (:status resp)))
       (t/is (= "{\"result\":" (subs (:body resp) 0 10))))))

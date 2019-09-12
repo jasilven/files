@@ -5,8 +5,8 @@
             [clojure.java.io :as io]
             [cheshire.core :as json]))
 
-;; (def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
-(def api-uri "https://localhost:8080/api/files")
+(def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
+;; (def api-uri "https://localhost:8080/api/files")
 (def auth-options {:basic-auth ["apiuser" "1234"] :insecure? true})
 
 (def metadata (json/generate-string {:title "lorem ipsum dolor"
@@ -36,6 +36,9 @@
                                                       :file_data (b64/encode-file "test/testfile.jpg")
                                                       :metadata "kuraa"}))
 
+(def non-metadata-document (json/generate-string {:file_name "non-metadata-document.jpg"
+                                                  :mime_type "image/jpg"
+                                                  :file_data (b64/encode-file "test/testfile.jpg")}))
 (defn spy [x] (println x) x)
 
 (defn post-document
@@ -122,4 +125,5 @@
   ;; This should return 400 and error response!
   ;; try to post document with invalid metadata json
   (:body (client/post api-uri (merge auth-options {:content-type :json :throw-exceptions false :body invalid-metadata-document})))
+  (:body (client/post api-uri (merge auth-options {:content-type :json :throw-exceptions false :body non-metadata-document})))
   )

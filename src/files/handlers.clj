@@ -54,32 +54,38 @@
         (json-response 200 result)))
     (catch Exception e (json-error 400 e "failed to get document"))))
 
-(defn required-keys-ok?
-  "Return true if document contains required keys and they are non-empty and false otherwise."
-  [document]
-  (every? #(and (contains? document %)
-                (not-empty (get document %))) required-document-keys))
+;; (defn required-keys-ok?
+;;   "Return true if document contains required keys and they are non-empty and false otherwise."
+;;   [document]
+;;   (every? #(and (contains? document %)
+;;                 (not-empty (get document %))) required-document-keys))
 
 (defn valid-json?
-  "Returns true if input is nil or valid json, false otherwise."
+  "Returns true if input is valid json, false otherwise."
   [input]
-  (if (nil? input)
-    true
-    (try (json/parse-string input)
-         true
-         (catch Exception e false))))
+  (try (json/parse-string input)
+       true
+       (catch Exception e false)))
+
+(defn validate-document
+  "Return true if document is valid and throw if not."
+  [document]
+  (let [metadata (:metadata document)]
+    (when (not-every? #(and (contains? document %)
+                            (not-empty (get document %))) required-document-keys)
+      (throw (ex-info "required key missing" {:document-keys (keys document)
+                                              :required-keys required-document-keys})))
+    (when-not (or (nil? metadata)
+                  (valid-json? metadata))
+      (throw (ex-info "invalid JSON in metadata" {:metadata metadata}))))
+  true)
 
 (defn create-document
   "Create document and return id as json response."
   [ds request]
   (try
-    (let [document (json/parse-string (slurp (:body request)) true)
-          metadata (:metadata document)]
-      (if-not (required-keys-ok? document)
-        (throw (ex-info "required key missing" {:document-keys (keys document)
-                                                :required-keys required-document-keys})))
-      (if-not (valid-json? metadata)
-        (throw (ex-info "invalid JSON in metadata" {:metadata metadata})))
+    (let [document (json/parse-string (slurp (:body request)) true)]
+      (validate-document document)
       (json-ok (db/create-document ds document)))
     (catch Exception e (json-error 400 e (str "document creation failed: " (.getMessage e))))))
 
@@ -97,11 +103,8 @@
   [ds id request]
   (try
     (let [document (json/parse-string (slurp (:body request)) true)]
-      (if (required-keys-ok? document)
-        (if (db/update-document ds id document)
-          (json-ok {:result "success"})
-          (throw (ex-info "cannot update, maybe non-existing document" {:id id})))
-        (throw (ex-info "required field missing/empty" {:id id
-                                                        :request request
-                                                        :required-keys required-document-keys}))))
+      (validate-document document)
+      (if (db/update-document ds id document)
+        (json-ok {:result "success"})
+        (throw (ex-info "cannot update, maybe non-existing document" {:id id}))))
     (catch Exception e (json-error 400 e "document update failed"))))
