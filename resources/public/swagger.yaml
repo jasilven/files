@@ -81,7 +81,7 @@ components:
 security:
 - BasicAuth: []
 servers:
-- url: https://fi007martin.ddc.teliasonera.net:8080
+- url: https://FIXME:8080
 - url: https://localhost:8080
 paths:
   "/api/files":

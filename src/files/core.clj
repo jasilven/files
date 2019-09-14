@@ -7,9 +7,9 @@
             [files.handlers :as h]
             [files.admin-handlers :as admin]
             [ring.adapter.jetty :refer [run-jetty]]
-            [ring.middleware.basic-authentication
-             :refer
-             [wrap-basic-authentication]]
+            [buddy.auth.backends :as backends]
+            [buddy.auth.accessrules :refer [error wrap-access-rules]]
+            [buddy.auth.middleware :refer [wrap-authentication]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]])
   (:import org.eclipse.jetty.server.handler.StatisticsHandler))
@@ -20,14 +20,12 @@
   (log/error (str "Error:" (if (instance? Exception err) (.getMessage err) err)))
   (System/exit 1))
 
-;; read main configuration file
+;; main configuration
 (def config (try (read-string (slurp "config.edn"))
                  (catch Exception e (error-exit e))))
 
-;; set up db configuration with connection pooling
-(def ds (try (db/get-datasource config) (catch Exception e (error-exit e))))
-
-(def access-denied {:status 403 :body "access denied" :headers {}})
+(def ds (try (db/get-datasource config)
+             (catch Exception e (error-exit e))))
 
 (defonce http-server (atom nil))
 
@@ -43,26 +41,15 @@
                        (log/info "Server stopped."))))
     "Shutting down"))
 
-(defn authenticate
-  "Authenticate user and return authenticated user name or nil."
-  [username password]
-  (when-not (or (nil? username) (nil? password))
-    (if (= username (get-in config [:admin :name]))
-      (when (= password (get-in config [:admin :password])) username)
-      (when (= password (get-in config [:users username])) username))))
-
-(defn admin? [request]
-  (= (get-in config [:admin :name]) (:basic-authentication request)))
-
 (def admin-routes
   (routes
-   (GET "/admin" request (if (admin? request) (admin/main ds config) access-denied))
-   (POST "/admin/upload" request (if (admin? request) (admin/upload ds request) access-denied))
-   (GET "/admin/close/:id" [id :as request] (if (admin? request) (admin/close ds id) access-denied))
-   (GET "/admin/open/:id" [id :as request] (if (admin? request) (admin/open ds id) access-denied))
-   (GET "/admin/download/:id" [id :as request] (if (admin? request) (admin/download ds id) access-denied))
-   (GET "/admin/details/:id" [id :as request] (if (admin? request) (admin/details ds id) access-denied))
-   (GET "/admin/shutdown" request (if (admin? request) (stop) access-denied))))
+   (GET "/admin" request (admin/main ds config))
+   (POST "/admin/upload" request (admin/upload ds request))
+   (GET "/admin/close/:id" [id :as request] (admin/close ds id))
+   (GET "/admin/open/:id" [id :as request] (admin/open ds id))
+   (GET "/admin/download/:id" [id :as request] (admin/download ds id))
+   (GET "/admin/details/:id" [id :as request] (admin/details ds id))
+   (GET "/admin/shutdown" request (stop))))
 
 (def api-routes
   (routes
@@ -78,14 +65,45 @@
    (GET "/" [] (clojure.java.io/resource "public/index.html"))
    (route/resources "/")))
 
+(defn admin?
+  [request]
+  (if (true? (get-in request [:identity :admin])) true false))
+
+(defn authenticated?
+  [request]
+  (if-not (nil? (:identity request)) true false))
+
+(defn any-access
+  [request]
+  true)
+
+(def access-rules [{:pattern #"^/admin/.*" :handler admin?}
+                   {:pattern #"^/admin$" :handler admin?}
+                   {:pattern #"^/swagger$" :handler any-access}
+                   {:pattern #"^/swagger.yaml$" :handler any-access}
+                   {:pattern #"^/public/.*$" :handler any-access}
+                   {:pattern #"^/css/.*$" :handler any-access}
+                   {:pattern #"^/.*" :handler authenticated?}])
+
+(defn auth-error [request exp]
+  (log/warn exp "Authentication failed:" (dissoc request :headers) ))
+
+(defn access-error [request exp]
+  (log/warn exp "Unauthorized access attempt:" (dissoc request :headers) ))
+
 (def app
   (routes
    pub-routes
    (-> (routes api-routes admin-routes)
-       (wrap-basic-authentication authenticate)
+       (wrap-access-rules {:rules access-rules
+                           :on-error access-error})
+       (wrap-authentication (backends/jws {:secret (:secret config)
+                                           :on-error auth-error
+                                           :options {:alg :hs256}
+                                           :token-name "Bearer"}))
        wrap-params
        wrap-multipart-params)
-   (route/not-found "Nothing")))
+   (route/not-found "Not Found!")))
 
 (defn configurator
   "Return configurator for jetty."
@@ -105,8 +123,8 @@
         (log/info "DB connection ok, but files table missing. Creating files table.")
         (db/create-files-table ds))
       (if (db/files-exists? ds)
-        (reset! http-server (run-jetty app (assoc (:jetty config)
-                                                  :configurator configurator)))
+        (reset! http-server (run-jetty app
+                                       (assoc (:jetty config) :configurator configurator)))
         (error-exit "Problem with creating files table. Exiting."))
       (log/info "Server started.")
       (catch Exception e (error-exit e)))
@@ -118,3 +136,22 @@
 
 (defn -main []
   (start))
+
+;; (defn authenticate
+;;   "Authenticate user and return authenticated user name or nil."
+;;   [username password]
+;;   (when-not (or (nil? username) (nil? password))
+;;     (if (= username (get-in config [:admin :name]))
+;;       (when (= password (get-in config [:admin :password])) username)
+;;       (when (= password (get-in config [:users username])) username))))
+
+;; (defn authenticated-user
+;;   "Return true if user is authenticated"
+;;   [request]
+;;   (if (:identity request) true false))
+
+;; (defn admin? [request]
+;;   (= (get-in config [:admin :name]) (:basic-authentication request)))
+
+;; (defn access-denied [request value]
+;;   {:status 401 :body "access denied" :headers {}})

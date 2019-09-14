@@ -54,12 +54,6 @@
         (json-response 200 result)))
     (catch Exception e (json-error 400 e "failed to get document"))))
 
-;; (defn required-keys-ok?
-;;   "Return true if document contains required keys and they are non-empty and false otherwise."
-;;   [document]
-;;   (every? #(and (contains? document %)
-;;                 (not-empty (get document %))) required-document-keys))
-
 (defn valid-json?
   "Returns true if input is valid json, false otherwise."
   [input]

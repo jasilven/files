@@ -5,10 +5,10 @@
             [clojure.java.io :as io]
             [cheshire.core :as json]))
 
-(def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
-;; (def api-uri "https://localhost:8080/api/files")
-(def auth-options {:basic-auth ["apiuser" "1234"] :insecure? true})
-
+;; (def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
+(def api-uri "https://localhost:8080/api/files")
+(def admin-uri "https://localhost:8080/admin")
+(def auth-options {:insecure? true :oauth-token "XeyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiamFyaSIsIm9yaWdpbiI6InRlc3RpYXBwaSJ9.GgZlYPvCbqfC4V7GhRqsZn-tgVIUS-gB6Tir06CCl0w"})
 (def metadata (json/generate-string {:title "lorem ipsum dolor"
                                      :owner "Gene Roddenberry"
                                      :creator "Ian Fleming"
@@ -121,6 +121,11 @@
 
   ;; randomly update all documents
   (update-documents [pdf-document jpg-document])
+
+  ;; auth test
+  (client/get api-uri (merge auth-options {:content-type :json :throw-exceptions false}))
+
+  (client/get admin-uri (merge auth-options {:content-type :json :throw-exceptions false}))
 
   ;; This should return 400 and error response!
   ;; try to post document with invalid metadata json
