@@ -1,69 +1,85 @@
 (ns files.core
   (:gen-class)
-  (:require [clojure.tools.logging :as log]
-            [compojure.core :refer [defroutes DELETE GET PUT POST routes]]
+  (:require [buddy.auth.accessrules :refer [wrap-access-rules]]
+            [buddy.auth.backends :as backends]
+            [buddy.auth.middleware :refer [wrap-authentication]]
+            [clojure.tools.logging :as log]
+            [compojure.core :refer [DELETE GET POST PUT routes]]
             [compojure.route :as route]
             [files.db :as db]
             [files.handlers :as h]
-            [files.admin-handlers :as admin]
             [ring.adapter.jetty :refer [run-jetty]]
-            [buddy.auth.backends :as backends]
-            [buddy.auth.accessrules :refer [error wrap-access-rules]]
-            [buddy.auth.middleware :refer [wrap-authentication]]
+            [ring.middleware.cors :refer [wrap-cors]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-            [ring.middleware.params :refer [wrap-params]])
+            [ring.middleware.params :refer [wrap-params]]
+            [clojure.java.io :as io])
   (:import org.eclipse.jetty.server.handler.StatisticsHandler))
 
+(defonce ^:private CONFIG (atom nil))
+(defonce ^:private SERVER (atom nil))
+
 (defn error-exit
-  "Print error message and exit."
+  "Print error message and exit with return code 1."
   [err]
-  (log/error (str "Error:" (if (instance? Exception err) (.getMessage err) err)))
+  (log/error (str (if (instance? Exception err) (.getMessage err) err)))
   (System/exit 1))
 
-;; main configuration
-(def config (try (read-string (slurp "config.edn"))
-                 (catch Exception e (error-exit e))))
-
-(def ds (try (db/get-datasource config)
-             (catch Exception e (error-exit e))))
-
-(defonce http-server (atom nil))
+(defn reset-config!
+  "Read and initialize main configuration from config file/arguments/environment variables.
+  If no ssl-keystore password or secret are passed as arguments they are read from
+  environment variables KEYPASS and TOKEN_SECRET."
+  [{:keys [path keypass token-secret] :or {keypass (System/getenv "KEYPASS")
+                                           token-secret (System/getenv "TOKEN_SECRET")}}]
+  (when (nil? token-secret)
+    (error-exit "Token secret missing. Set it with TOKEN_SECRET env variable."))
+  (reset! CONFIG
+          (-> (read-string (slurp path))
+              (assoc-in [:jetty :key-password] keypass)
+              (assoc-in [:db-spec :user] (System/getenv "DBUSER"))
+              (assoc-in [:db-spec :password] (System/getenv "DBPASS"))
+              (assoc :token-secret token-secret))))
 
 (defn stop
-  "Gracefully shutdown the web server and db connection pool."
+  "Gracefully shutdown the web server and database/datasource connection pool."
   []
-  (when (some? @http-server)
-    (.start (Thread. (fn []
-                       (log/info "Server shutdown in progress.")
-                       (.stop @http-server)
-                       (log/info "Closing db connections.")
-                       (.close ds)
-                       (log/info "Server stopped."))))
-    "Shutting down"))
+  (try
+    (if (some? @SERVER)
+      (do 
+        (log/info "Server shutdown in progress.")
+        (.stop @SERVER)
+        (reset! SERVER nil)
+        (log/info "Closing db connections.")
+        (db/drop-datasource)
+        (log/info "Server stopped.")
+        (h/json-ok {:result "Server going down."}))
+      (h/json-ok {:result "No server running."}))
+    (catch Exception e (h/json-error 500 e (str "Error: " (.getMessage e))))))
 
 (def admin-routes
   (routes
-   (GET "/admin" request (admin/main ds config))
-   (POST "/admin/upload" request (admin/upload ds request))
-   (GET "/admin/close/:id" [id :as request] (admin/close ds id))
-   (GET "/admin/open/:id" [id :as request] (admin/open ds id))
-   (GET "/admin/download/:id" [id :as request] (admin/download ds id))
-   (GET "/admin/details/:id" [id :as request] (admin/details ds id))
-   (GET "/admin/shutdown" request (stop))))
+   #_(POST "/admin/upload" request (admin/upload request))
+   #_(GET "/admin/close/:id" [id :as request] (admin/close id))
+   #_(GET "/admin/open/:id" [id :as request] (admin/open id))
+   #_(GET "/admin/download/:id" [id :as request] (admin/download id))
+   #_(GET "/admin/details/:id" [id :as request] (admin/details id))))
 
 (def api-routes
   (routes
-   (GET "/api/files/:id" [id] (h/get-document ds id true))
-   (PUT "/api/files/:id" [id :as request] (h/update-document ds id request))
-   (DELETE "/api/files/:id" [id] (h/close-document ds id))
-   (GET "/api/files" [limit] (h/get-documents-json ds limit))
-   (POST "/api/files" request (h/create-document ds request))))
+   (GET "/api/files/:id/download" [id :as request] (h/download request id))
+   (GET "/api/files/:id" [id :as request] (h/get-document request id true))
+   (PUT "/api/files/:id" [id :as request] (h/update-document request id))
+   (DELETE "/api/files/:id" [id :as request] (h/close-document request id))
+   (GET "/api/files" [limit :as request] (h/get-documents-json request limit))
+   (POST "/api/files" request (h/create-document request))))
 
 (def pub-routes
   (routes
-   (GET "/swagger" [] (clojure.java.io/resource "public/index.html"))
-   (GET "/" [] (clojure.java.io/resource "public/index.html"))
-   (route/resources "/")))
+   (GET "/login" request (io/resource "public/index.html"))
+   (POST "/token" request [] (h/token request (:token-secret @CONFIG)))
+   (GET "/swagger" [] (io/resource "public/swagger.html"))
+   (GET "/" [] (io/resource "public/swagger.html"))
+   (route/resources "/")
+   #_(route/not-found "Not Found")))
 
 (defn admin?
   [request]
@@ -73,85 +89,74 @@
   [request]
   (if-not (nil? (:identity request)) true false))
 
-(defn any-access
-  [request]
-  true)
+(defn public [request] true)
 
 (def access-rules [{:pattern #"^/admin/.*" :handler admin?}
-                   {:pattern #"^/admin$" :handler admin?}
-                   {:pattern #"^/swagger$" :handler any-access}
-                   {:pattern #"^/swagger.yaml$" :handler any-access}
-                   {:pattern #"^/public/.*$" :handler any-access}
-                   {:pattern #"^/css/.*$" :handler any-access}
+                   {:pattern #"^/api/.*$" :handler authenticated?}
+                   {:pattern #"^/swagger$" :handler public}
+                   {:pattern #"^/swagger.html$" :handler public}
+                   {:pattern #"^/swagger.yaml$" :handler public}
+                   {:pattern #"^/css/.*$" :handler public}
+                   {:pattern #"^/js/.*$" :handler public}
+                   {:pattern #"^/token$" :handler public}
+                   {:pattern #"^/login$" :handler public}
                    {:pattern #"^/.*" :handler authenticated?}])
 
+(def access-denied {:status  200 :headers {} :body "Access Denied!"})
+
 (defn auth-error [request exp]
-  (log/warn exp "Authentication failed:" (dissoc request :headers) ))
+  (log/warn exp "Authentication failed:" (dissoc request :headers))
+  access-denied)
 
 (defn access-error [request exp]
-  (log/warn exp "Unauthorized access attempt:" (dissoc request :headers) ))
-
-(def app
-  (routes
-   pub-routes
-   (-> (routes api-routes admin-routes)
-       (wrap-access-rules {:rules access-rules
-                           :on-error access-error})
-       (wrap-authentication (backends/jws {:secret (:secret config)
-                                           :on-error auth-error
-                                           :options {:alg :hs256}
-                                           :token-name "Bearer"}))
-       wrap-params
-       wrap-multipart-params)
-   (route/not-found "Not Found!")))
+  (log/warn exp "Unauthorized access attempt:" (dissoc request :headers))
+  access-denied)
 
 (defn configurator
-  "Return configurator for jetty."
+  "Returns jetty configurator."
   [server]
   (let [stats-handler (StatisticsHandler.)]
     (.setHandler stats-handler (.getHandler server))
     (.setHandler server stats-handler)
-    (.setStopTimeout server (* 1000 (:shutdown-secs config)))
+    (.setStopTimeout server (* 1000 (:shutdown-secs @CONFIG)))
     (.setStopAtShutdown server true)))
 
-(defn start
-  "Start application."
+(defn run-server
   []
-  (if (db/db-connection? ds)
-    (try
-      (when-not (db/files-exists? ds)
-        (log/info "DB connection ok, but files table missing. Creating files table.")
-        (db/create-files-table ds))
-      (if (db/files-exists? ds)
-        (reset! http-server (run-jetty app
-                                       (assoc (:jetty config) :configurator configurator)))
-        (error-exit "Problem with creating files table. Exiting."))
-      (log/info "Server started.")
-      (catch Exception e (error-exit e)))
-    (error-exit "No DB connection. Ensure that DB is running or check configuration.")))
+  (-> (routes pub-routes api-routes admin-routes)
+      wrap-params
+      wrap-multipart-params
+      (wrap-access-rules {:rules access-rules
+                          :on-error access-error})
+      (wrap-authentication (backends/jws {:secret (:token-secret @CONFIG)
+                                          :on-error auth-error
+                                          :options {:alg :hs512}
+                                          :token-name "Bearer"}))
+      (wrap-cors :access-control-allow-origin [#".*"]
+                 :access-control-allow-credentials "true"
+                 :access-control-allow-methods [:post :get :put :delete])
+      (run-jetty (assoc (:jetty @CONFIG) :configurator configurator))))
+
+(defn start
+  "Starts database/datasource connection and web server."
+  ([config]
+   (try
+     (reset-config! config)
+     (db/setup-datasource (:db-spec @CONFIG))
+     (when-not (db/db-connection?)
+       (throw (.Exception "No DB connection. Check DB and/or DB configuration.")))
+     (when-not (db/files-exists?)
+       (log/info "DB connection ok, but files table missing. Creating files table.")
+       (db/create-files-table))
+     (reset! SERVER (run-server))
+     (log/info "Server started.")
+     (catch Exception e (error-exit e)))))
 
 (comment
-  (start)
-  (stop))
+  (start {:path "config_test.edn" :keypass "123456" :token-secret "123456"})
+  (stop)
+  ;;
+  )
 
 (defn -main []
-  (start))
-
-;; (defn authenticate
-;;   "Authenticate user and return authenticated user name or nil."
-;;   [username password]
-;;   (when-not (or (nil? username) (nil? password))
-;;     (if (= username (get-in config [:admin :name]))
-;;       (when (= password (get-in config [:admin :password])) username)
-;;       (when (= password (get-in config [:users username])) username))))
-
-;; (defn authenticated-user
-;;   "Return true if user is authenticated"
-;;   [request]
-;;   (if (:identity request) true false))
-
-;; (defn admin? [request]
-;;   (= (get-in config [:admin :name]) (:basic-authentication request)))
-
-;; (defn access-denied [request value]
-;;   {:status 401 :body "access denied" :headers {}})
+  (start {:path "config.edn"}))

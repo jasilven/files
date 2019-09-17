@@ -1,4 +1,6 @@
 {:paths ["src" "resources"]
+ :aliases {:test {:extra-paths ["test"]}
+           :dev {:extra-paths ["test"]}}
  :deps
  {cli-matic {:mvn/version "0.3.8"}
   buddy/buddy-hashers {:mvn/version "1.4.0"}
@@ -13,6 +15,7 @@
   seancorfield/next.jdbc {:mvn/version "1.0.1"}
   clojure.jdbc/clojure.jdbc-c3p0 {:mvn/version "0.3.3"}
   org.postgresql/postgresql {:mvn/version "42.2.5"}
+  ring-cors {:mvn/version "0.1.13"}
   ring {:mvn/version "1.7.0"}
   org.clojure/java.jdbc {:mvn/version "0.7.9"}
   hiccup {:mvn/version "1.0.5"}

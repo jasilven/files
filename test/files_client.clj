@@ -3,82 +3,93 @@
   (:require [clj-http.client :as client]
             [files.b64 :as b64]
             [clojure.java.io :as io]
-            [cheshire.core :as json]))
+            [files.token :as token]
+            [files.json :as json]))
 
 ;; (def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
-(def api-uri "https://localhost:8080/api/files")
-(def admin-uri "https://localhost:8080/admin")
-(def auth-options {:insecure? true :oauth-token "XeyJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjoiamFyaSIsIm9yaWdpbiI6InRlc3RpYXBwaSJ9.GgZlYPvCbqfC4V7GhRqsZn-tgVIUS-gB6Tir06CCl0w"})
-(def metadata (json/generate-string {:title "lorem ipsum dolor"
-                                     :owner "Gene Roddenberry"
-                                     :creator "Ian Fleming"
-                                     :type "agreement"
-                                     :date "2020-12-12"
-                                     :status "draft"
-                                     :version 3
-                                     :sensitivity "normal"
-                                     :importance "urgent"
-                                     :customerID "A-95878649"
-                                     :sector "B2O"}))
+(def uri "https://localhost:8080")
+(def user-token (token/generate {:user "testuser" :origin "testorigin" :secret "123456" :days 1}))
+(def auth-options {:insecure? true :oauth-token user-token})
+(def metadata (json/clj->json {:title "lorem ipsum dolor"
+                               :owner "Gene Roddenberry"
+                               :creator "Ian Fleming"
+                               :type "agreement"
+                               :date "2020-12-12"
+                               :status "draft"
+                               :version 3
+                               :sensitivity "normal"
+                               :importance "urgent"
+                               :customerID "A-95878649"
+                               :sector "B2O"}))
 
-(def pdf-document (json/generate-string {:file_name "testfile.pdf"
-                                         :mime_type "application/pdf"
-                                         :file_data (b64/encode-file "test/testfile.pdf")
-                                         :metadata metadata}))
+(def pdf-document (json/clj->json {:filename "testfile.pdf"
+                                   :mimetype "application/pdf"
+                                   :filedata (b64/encode-file "test/testfile.pdf")
+                                   :metadata metadata}))
 
-(def jpg-document (json/generate-string {:file_name "testfile.jpg"
-                                         :mime_type "image/jpg"
-                                         :file_data (b64/encode-file "test/testfile.jpg")
-                                         :metadata metadata}))
+(def jpg-document (json/clj->json {:filename "testfile.jpg"
+                                   :mimetype "image/jpg"
+                                   :filedata (b64/encode-file "test/testfile.jpg")
+                                   :metadata metadata}))
 
-(def invalid-metadata-document (json/generate-string {:file_name "testfile.jpg"
-                                                      :mime_type "image/jpg"
-                                                      :file_data (b64/encode-file "test/testfile.jpg")
-                                                      :metadata "kuraa"}))
+(def invalid-metadata-document (json/clj->json {:filename "testfile.jpg"
+                                                :mimetype "image/jpg"
+                                                :filedata (b64/encode-file "test/testfile.jpg")
+                                                :metadata "kuraa"}))
 
-(def non-metadata-document (json/generate-string {:file_name "non-metadata-document.jpg"
-                                                  :mime_type "image/jpg"
-                                                  :file_data (b64/encode-file "test/testfile.jpg")}))
+(def non-metadata-document (json/clj->json {:filename "non-metadata-document.jpg"
+                                            :mimetype "image/jpg"
+                                            :filedata (b64/encode-file "test/testfile.jpg")}))
 (defn spy [x] (println x) x)
 
 (defn post-document
   "post document and return document id"
   [document]
-  (-> (client/post api-uri (merge auth-options {:content-type :json :body document}))
+  (-> (client/post (str uri "/api/files") (merge auth-options {:content-type :json :body document}))
       :body
-      (json/parse-string true)
+      (json/json->clj)
       :id))
 
 (defn get-documents
   "return list documents"
   []
-  (-> (client/get api-uri auth-options)
+  (-> (client/get (str uri "/api/files") auth-options)
       :body
-      (json/parse-string true)))
+      (json/json->clj)))
+
+(comment
+  (get-documents)
+  ;;
+  )
 
 (defn get-document
   "return document by id"
   [id]
-  (-> (client/get (str api-uri "/" id) auth-options)
+  (-> (client/get (str uri "/api/files/" id) auth-options)
       :body
-      (json/parse-string true)))
+      (json/json->clj)))
+
+(defn download-document
+  "return document by id"
+  [id]
+  (-> (client/get (str uri "/api/files/" id "/download") auth-options) :body))
 
 (defn update-document
   "update document by id"
   [id document]
   (try
-    (-> (client/put (str api-uri "/" id) (merge auth-options {:content_type :json :body document}))
+    (-> (client/put (str uri "/api/files/" id) (merge auth-options {:content_type :json :body document}))
         :body
-        (json/parse-string true))
+        (json/json->clj))
     (catch Exception e (println (.getMessage e) (ex-data e)))))
 
 (defn write-document
   "write document to file"
-  [id fname]
+  [id path]
   (-> (get-document id)
-      :file_data
+      :filedata
       (b64/decode)
-      (clojure.java.io/copy (java.io.File. fname))))
+      (clojure.java.io/copy (java.io.File. path))))
 
 (defn generate-documents
   "post document from documents vector randomly n times"
@@ -93,8 +104,8 @@
   "randomly update all documents to one in test-documents vector"
   [test-documents]
   (try
-    (let [resp (client/get api-uri auth-options)
-          docs (json/parse-string (:body resp) true)
+    (let [resp (client/get (str uri "/api/files") auth-options)
+          docs (json/json->clj (:body resp))
           doc-cnt (count test-documents)]
       (doseq [doc docs]
         (update-document (:id doc) (get test-documents (rand-int doc-cnt)))))
@@ -102,13 +113,16 @@
 
 (comment
   ;; post one document
-  (post-document jpg-document)
+  (post-document pdf-document)
 
   ;; get documents as vector
   (into [] (get-documents))
 
   ;; post and get
-  (-> (post-document jpg-document) (get-document) (dissoc :file_data))
+  (-> (post-document jpg-document) (get-document) (dissoc :filedata))
+
+  ;; post and download
+  (-> (post-document jpg-document) (download-document) (clojure.java.io/copy (java.io.File. "/tmp/myout.jpg")))
 
   ;; post, get and write document to file
   (let [id (post-document pdf-document)]
@@ -123,12 +137,22 @@
   (update-documents [pdf-document jpg-document])
 
   ;; auth test
-  (client/get api-uri (merge auth-options {:content-type :json :throw-exceptions false}))
+  (client/get (str uri "/api/files") (merge auth-options {:content-type :json :throw-exceptions false}))
 
-  (client/get admin-uri (merge auth-options {:content-type :json :throw-exceptions false}))
+  (client/get (str uri "/admin") (merge auth-options {:content-type :json :throw-exceptions false}))
 
   ;; This should return 400 and error response!
   ;; try to post document with invalid metadata json
-  (:body (client/post api-uri (merge auth-options {:content-type :json :throw-exceptions false :body invalid-metadata-document})))
-  (:body (client/post api-uri (merge auth-options {:content-type :json :throw-exceptions false :body non-metadata-document})))
+  (client/post (str uri "/api/files")
+               (merge auth-options
+                      {:content-type :json
+                       :throw-exceptions false
+                       :body invalid-metadata-document}))
+
+  ;; non metadata post, should work
+  (:body (client/post (str uri "/api/files")
+                      (merge auth-options
+                             {:content-type :json
+                              :throw-exceptions false
+                              :body non-metadata-document})))
   )

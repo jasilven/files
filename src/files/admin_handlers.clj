@@ -28,9 +28,9 @@
 
 (defn download
   "Return file response with file's mime type set to content-type."
-  [ds id]
+  [id]
   (try
-    (let [result (db/get-document ds id true)]
+    (let [result (db/get-document id true)]
       (if (nil? result)
         (response 404 (str "Document not found, id: " id))
         {:status 200
@@ -41,14 +41,14 @@
 ;; TODO: add unit test
 (defn upload
   "Create new document from form upload."
-  [ds request]
+  [request]
   (try
     (let [file-param (get (:params request) "file")
           file_name (:filename file-param)]
       (if (empty? file_name)
         (throw (ex-info "upload error, input file missing" {:request request}))
         (let [file_data (b64/encode-file (:tempfile file-param))
-              _ (db/create-document ds {:file_name file_name
+              _ (db/create-document {:file_name file_name
                                         :mime_type (:content-type file-param)
                                         :file_data file_data})]
           (redirect "/admin"))))
@@ -57,34 +57,34 @@
 ;; TODO: add unit test
 (defn details
   "Render document details."
-  [ds id]
+  [id]
   (try
-    (let [document (db/get-document ds id false)]
+    (let [document (db/get-document id false)]
       (if (nil? document)
         (throw (ex-info "document not found" {:id id}))
-        (ok (views/details document (db/get-auditlogs ds id DEFAULT-LOG-LIMIT)))))
+        (ok (views/details document (db/get-auditlogs id DEFAULT-LOG-LIMIT)))))
     (catch Exception e (error e "unable to show document details"))))
 
 ;; TODO: add unit test
 (defn close
   "Mark document closed."
-  [ds id]
+  [id]
   (try
-    (db/close-document ds id)
-    (ok (views/details (db/get-document ds id false) (db/get-auditlogs ds id DEFAULT-LOG-LIMIT)))
+    (db/close-document id)
+    (ok (views/details (db/get-document id false) (db/get-auditlogs id DEFAULT-LOG-LIMIT)))
     (catch Exception e (error e "document deletion failed"))))
 
 ;; TODO: add unit test
 (defn open
   "Mark document open."
-  [ds id]
+  [id]
   (try
-    (db/open-document ds id)
-    (ok (views/details (db/get-document ds id false) (db/get-auditlogs ds id DEFAULT-LOG-LIMIT)))
+    (db/open-document id)
+    (ok (views/details (db/get-document id false) (db/get-auditlogs id DEFAULT-LOG-LIMIT)))
     (catch Exception e (error e "document open failed"))))
 
 (defn main
   "Render admin page."
-  [ds config]
-  (try (ok (views/admin (db/get-documents ds 50) config))
+  [config]
+  (try (ok (views/admin (db/get-documents 50) config))
        (catch Exception e (error e "unable to show main page"))))

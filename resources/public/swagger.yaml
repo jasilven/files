@@ -9,9 +9,6 @@ info:
     email: me@me
 components:
   securitySchemes:
-    BasicAuth:
-      type: http
-      scheme: basic
     bearerAuth:
       type: http
       scheme: bearer
@@ -50,7 +47,7 @@ components:
           type: string
           format: date-time 
           example: '2020-12-05T09:41:27.412Z'
-        file_name:
+        filename:
           type: string
           example: document.pdf
         category:
@@ -59,13 +56,13 @@ components:
         metadata:
           type: string
           example: '{"author":"Pulkkinen","status":"draft"}'
-        file_size:
+        filesize:
           readOnly: true
           type: integer
           mimimum: 0
           format: int64
           example: '123456'
-        mime_type:
+        mimetype:
           type: string
           example: application/pdf
     Document:
@@ -73,16 +70,11 @@ components:
       - $ref: '#/components/schemas/DocumentInfo'
       - type: object
         properties:
-          file_data:
+          filedata:
             type: string
             format: byte
             description: base64 encoded characters
             example: ZmlsZXM=
-security:
-- BasicAuth: []
-servers:
-- url: https://FIXME:8080
-- url: https://localhost:8080
 paths:
   "/api/files":
     get:
@@ -122,14 +114,14 @@ paths:
             schema:
               type: object
               properties:
-                file_name:
+                filename:
                   type: string
                   example: somefile.txt
-                file_data:
+                filedata:
                   type: string
                   format: byte
                   example: ZmlsZXM=
-                mime_type:
+                mimetype:
                   type: string
                   example: text/plain
                 category:
@@ -139,9 +131,9 @@ paths:
                   type: string
                   example: '{"author":"Pulkkinen","status":"draft"}'
               required:
-              - file_name
-              - file_data
-              - mime_type
+              - filename
+              - filedata
+              - mimetype
       responses:
         '200':
           description: Document id
@@ -171,14 +163,14 @@ paths:
             schema:
               type: object
               properties:
-                file_name:
+                filename:
                   type: string
                   example: somefile.txt
-                file_data:
+                filedata:
                   type: string
                   format: byte
                   example: ZmlsZXM=
-                mime_type:
+                mimetype:
                   type: string
                   example: text/plain
                 category:
@@ -188,9 +180,9 @@ paths:
                   type: string
                   example: '{"author":"Pulkkinen","status":"draft"}'
               required:
-              - file_name
-              - mime_type
-              - file_data
+              - filename
+              - mimetype
+              - filedata
       parameters:
       - name: id
         in: path

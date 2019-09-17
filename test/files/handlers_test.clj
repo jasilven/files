@@ -1,185 +1,181 @@
 (ns files.handlers-test
-  (:require [cheshire.core :as json]
-            [clojure.test :as t]
+  (:require [clojure.test :as t]
+            [files.json :as json]
             [files.db :as db]
-            [files.b64 :as b64]
+            [files.test-data :refer :all]
             [files.handlers :as h]))
 
-(def test-ds (db/get-datasource (read-string (slurp "config_test.edn"))))
-
-(def test-document {:file_name "test/testfile.pdf"
-                    :mime_type "application/pdf"
-                    :file_data (b64/encode-file "test/testfile.pdf")})
-
-(def test-document2 {:file_name "test/testfile.jpg"
-                     :mime_type "image/jpg"
-                     :file_data (b64/encode-file "test/testfile.jpg")})
-
-(def test-invalid-document {:file_name "test/testfile.jpg"
-                            :mime_type "image/jpg"
-                            :file_data (b64/encode-file "test/testfile.jpg")
-                            :metadata "invalid metadata"})
-
-(defn response->document
-  "parse document from http response to document edn"
-  [response]
-  (json/parse-string (:body response) true))
-
 (defn test-fixture-each [f]
-  (db/create-files-table test-ds)
+  (db/setup-datasource test-db-spec)
+  (db/create-files-table)
   (f)
-  (db/drop-files-table test-ds))
-
-(defn test-fixture-once [f]
-  (f)
-  (.close test-ds))
+  (db/drop-files-table)
+  (db/drop-datasource))
 
 (t/use-fixtures :each test-fixture-each)
-(t/use-fixtures :once test-fixture-once)
 
 (t/deftest get-empty
   (t/testing "try to get stuff from empty db"
-    (t/is (= [] (h/get-documents test-ds 10)))
+    (t/is (= [] (h/get-documents test-identity 10)))
     (t/is (= {:status 200
               :body "[]"
               :headers {"Content-Type" "application/json"}}
-             (h/get-documents-json test-ds 10)))))
+             (h/get-documents-json test-identity 10)))))
 
 (t/deftest create-test
   (t/testing "create document"
-    (let [body (.getBytes (json/generate-string test-document))
-          response (h/create-document test-ds {:body body})
-          document (response->document response)]
+    (let [body (.getBytes (json/clj->json test-document))
+          response (h/create-document (merge {:body body} test-identity))
+          document (json/json->clj (:body response))]
       (t/is (= 200 (:status response)))
       (t/is (= {"Content-Type" "application/json"} (:headers response)))
-      (t/is (= false (empty? (:id document))))))
+      (t/is (some? (:id document)))
+      (t/is (uuid? (java.util.UUID/fromString (:id document))))))
   (t/testing "create without required field"
-    (let [test-doc (dissoc test-document :mime_type)
-          body (.getBytes (json/generate-string test-doc))
-          response (h/create-document test-ds {:body body})]
+    (let [test-doc (dissoc test-document :mimetype)
+          body (.getBytes (json/clj->json test-doc))
+          response (h/create-document {{:body body} test-identity})]
       (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+      (t/is (contains? (json/json->clj (:body response)) :result))))
   (t/testing "create with empty required field"
-    (let [test-doc (assoc test-document :file_data "")
-          body (.getBytes (json/generate-string test-doc))
-          response (h/create-document test-ds {:body body})]
+    (let [test-doc (assoc test-document :filedata "")
+          body (.getBytes (json/clj->json test-doc))
+          response (h/create-document (merge {:body body} test-identity))]
       (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
-  (t/testing "create without file_data"
-    (let [test-doc (assoc test-document :file_data nil)
-          body (.getBytes (json/generate-string test-doc))
-          response (h/create-document test-ds {:body body})]
+      (t/is (contains? (json/json->clj (:body response)) :result))))
+  (t/testing "create without filedata"
+    (let [test-doc (assoc test-document :filedata nil)
+          body (.getBytes (json/clj->json test-doc))
+          response (h/create-document (merge {:body body} test-identity))]
       (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10))))))
+      (t/is (contains? (json/json->clj (:body response)) :result)))))
 
 (t/deftest create-invalid-document
   (t/testing "create with incorrect json in metadata"
-    (let [test-body "{\"file_name\":\"testfile.pdf\",\"mime_type\":\"Y\",\"file_data\":\"Z\",\"metadata\":{\"zs}\"}"
-          response (h/create-document test-ds {:body (.getBytes test-body)})]
+    (let [test-body "{\"filename\":\"testfile.pdf\",\"mimetype\":\"Y\",\"filedata\":\"Z\",\"metadata\":{\"zs}\"}"
+          response (h/create-document (merge {:body (.getBytes test-body)} test-identity))]
       (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+      (t/is (contains? (json/json->clj (:body response)) :result))))
   (t/testing "create with empty metadata"
-    (let [test-body "{\"file_name\":\"testfile.pdf\",\"mime_type\":\"Y\",\"file_data\":\"Z\",\"metadata\":\"}"
-          response (h/create-document test-ds {:body (.getBytes test-body)})]
-      (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+    (let [test-body "{\"filename\":\"testfile.pdf\",\"mimetype\":\"Y\",\"filedata\":\"Z\",\"metadata\":\"}"
+          response (h/create-document (merge {:body (.getBytes test-body)} test-identity))]
+      (t/is (= 400 (:status response)))))
   (t/testing "create with invalid metadata"
-    (let [test-body "{\"file_name\":\"testfile.pdf\",\"mime_type\":\"Y\",\"file_data\":\"Z\",\"metadata\":invalid\"}"
-          response (h/create-document test-ds {:body (.getBytes test-body)})]
-      (t/is (= 400 (:status response)))
-      (t/is (= "{\"result\":" (subs (:body response) 0 10)))))
+    (let [test-body "{\"filename\":\"testfile.pdf\",\"mimetype\":\"Y\",\"filedata\":\"Z\",\"metadata\":invalid\"}"
+          response (h/create-document (merge {:body (.getBytes test-body)} test-identity))]
+      (t/is (= 400 (:status response)))))
   (t/testing "create document with invalid metadata"
-    (let [body (.getBytes (json/generate-string test-invalid-document))
-          response (h/create-document test-ds {:body body})]
+    (let [doc (assoc test-document :metadata "invalid")
+          body (.getBytes (json/clj->json doc))
+          response (h/create-document (merge {:body body} test-identity))]
       (t/is (= 400 (:status response)))
       (t/is (= {"Content-Type" "application/json"} (:headers response))))))
 
 (t/deftest get-document
   (t/testing "create and then get single file with data"
-    (let [body (.getBytes (json/generate-string test-document))
-          create-resp (h/create-document test-ds {:body body})
-          id (:id (response->document create-resp))
-          get-resp (h/get-document test-ds id true)
-          get-nonexist (h/get-document test-ds (db/uuid) true)
-          get-invalid (h/get-document test-ds "invalid-id" true)]
+    (let [body (.getBytes (json/clj->json test-document))
+          create-resp (h/create-document (merge {:body body} test-identity))
+          id (:id (json/json->clj (:body create-resp)))
+          get-resp (h/get-document test-identity id true)
+          get-nonexist (h/get-document test-identity (db/uuid) true)
+          get-invalid (h/get-document test-identity "invalid-id" true)]
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status get-resp)))
       (t/is (= 400 (:status get-nonexist)))
       (t/is (= 400 (:status get-invalid)))
-      (t/is (= "{\"result\":" (subs (:body get-nonexist) 0 10)))
-      (t/is (= "{\"result\":" (subs (:body get-invalid) 0 10))))))
+      (t/is (contains? (json/json->clj (:body get-nonexist)) :result))
+      (t/is (contains? (json/json->clj (:body get-invalid)) :result)))))
+
+(t/deftest get-document-schema
+  (t/testing "create/get and check returned document schema"
+    (let [body (.getBytes (json/clj->json test-document))
+          create-resp (h/create-document (merge {:body body} test-identity))
+          id (:id (json/json->clj (:body create-resp)))
+          get-resp (h/get-document test-identity id true)
+          document (json/json->clj (:body get-resp))]
+      (t/is (= 200 (:status get-resp)))
+      (t/is (contains? document :id))
+      (t/is (contains? document :created))
+      (t/is (contains? document :updated))
+      (t/is (contains? document :closed))
+      (t/is (contains? document :filename))
+      (t/is (contains? document :category))
+      (t/is (contains? document :metadata))
+      (t/is (contains? document :filesize))
+      (t/is (contains? document :mimetype)))))
 
 (t/deftest get-documents
   (t/testing "create and then get files"
-    (let [body (.getBytes (json/generate-string test-document))
-          _ (h/create-document test-ds {:body body})
-          response (h/get-documents-json test-ds 10)
-          get-body (response->document response)]
+    (let [body (.getBytes (json/clj->json test-document))
+          _ (h/create-document (merge {:body body} test-identity))
+          response (h/get-documents-json test-identity 10)
+          get-body (json/json->clj (:body response))]
       (t/is (= 200 (:status response)))
       (t/is (= 1 (count get-body)))
       (t/is (= false (empty? (:id (first get-body)))))
       (t/is (= false (empty? (:created (first get-body)))))
-      (t/is (= (:file_name test-document) (:file_name (first get-body))))
-      (t/is (= (:mime_type test-document) (:mime_type (first get-body)))))))
+      (t/is (= (:filename test-document) (:filename (first get-body))))
+      (t/is (= (:mimetype test-document) (:mimetype (first get-body)))))))
 
 (t/deftest get-info
   (t/testing "create and then get file info as json"
-    (let [body (.getBytes (json/generate-string test-document))
-          create-resp (h/create-document test-ds {:body body})
-          id (:id (response->document create-resp))
-          get-resp (h/get-document test-ds id false)
-          document (response->document get-resp)]
+    (let [body (.getBytes (json/clj->json test-document))
+          create-resp (h/create-document (merge {:body body} test-identity))
+          id (:id (json/json->clj (:body create-resp)))
+          get-resp (h/get-document test-identity id false )
+          document (json/json->clj (:body get-resp))]
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status get-resp)))
-      (t/is (= (:file_name test-document) (:file_name document)))
-      (t/is (= (:mime_type test-document) (:mime_type document)))
+      (t/is (= (:filename test-document) (:filename document)))
+      (t/is (= (:mimetype test-document) (:mimetype document)))
       (t/is (not (empty? (:id document))))
       (t/is (not (empty? (:created document)))))))
 
 (t/deftest close-test
   (t/testing "create and then close single file"
-    (let [body (.getBytes (json/generate-string test-document))
-          create-resp (h/create-document test-ds {:body body})
-          id (:id (response->document create-resp))
-          close-resp (h/close-document test-ds id)]
+    (let [body (.getBytes (json/clj->json test-document))
+          create-resp (h/create-document (merge {:body body} test-identity))
+          id (:id (json/json->clj (:body create-resp)))
+          close-resp (h/close-document test-identity id)]
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status close-resp)))
-      (t/is (= "{\"result\":\"success\"}" (:body close-resp)))))
+      (t/is (= {:result "success"} (json/json->clj (:body close-resp))))))
   (t/testing "try to update non-existing document"
-    (let [resp (h/close-document test-ds "non-existing-id")]
+    (let [resp (h/close-document "non-existing-id" test-identity)]
       (t/is (= 400 (:status resp)))
-      (t/is (= "{\"result\":" (subs (:body resp) 0 10))))))
+      (t/is (contains? (json/json->clj (:body resp)) :result)))))
 
 (t/deftest update-test
   (t/testing "create and then update single file"
-    (let [body1 (.getBytes (json/generate-string test-document))
-          response1 (h/create-document test-ds {:body body1})
-          id1 (:id (response->document response1))
-          original (response->document (h/get-document test-ds id1 true))
-          body2 (.getBytes (json/generate-string test-document2))
-          response2 (h/update-document test-ds id1 {:body body2})
-          updated (response->document (h/get-document test-ds (:id original) true))]
-      (t/is (= true (contains? (json/parse-string (:body response1)) "id")))
-      (t/is (= "{\"result\":\"success\"}" (:body response2)))
+    (let [body1 (.getBytes (json/clj->json test-document))
+          response1 (h/create-document (merge {:body body1} test-identity))
+          id1 (:id (json/json->clj (:body response1)))
+          original (json/json->clj (:body (h/get-document test-identity id1 true )))
+          body2 (.getBytes (json/clj->json test-document2))
+          response2 (h/update-document (merge {:body body2} test-identity) id1)
+          updated (json/json->clj (:body (h/get-document test-identity (:id original) true)))]
+      (t/is (contains? (json/json->clj (:body response1)) :id))
+      (t/is (= {:result "success"} (json/json->clj (:body response2))))
       (t/is (= 200 (:status response1)))
       (t/is (= 200 (:status response2)))
       (t/is (= (:id original) (:id updated)))
       (t/is (= (:created original) (:created updated)))
       (t/is (some? (:updated updated)))
       (t/is (not= (:updated original) (:updated updated)))
-      (t/is (not= (:mime_type original) (:mime_type updated)))
-      (t/is (not= (:file_name original) (:file_name updated)))
-      (t/is (not= (count (:file_data original)) (count (:file_data updated))))))
+      (t/is (not= (:mimetype original) (:mimetype updated)))
+      (t/is (not= (:filename original) (:filename updated)))
+      (t/is (not= (count (:filedata original)) (count (:filedata updated))))))
   (t/testing "try to update non-existing document"
-    (let [resp (h/update-document test-ds "non-existing-id"
-                                  {:body (.getBytes (json/generate-string test-document))})]
+    (let [body (.getBytes (json/clj->json test-document))
+          resp (h/update-document (merge {:body body} test-identity) "non-existing-id" )]
       (t/is (= 400 (:status resp)))
-      (t/is (= "{\"result\":" (subs (:body resp) 0 10)))))
+      (t/is (contains? (json/json->clj (:body resp)) :result))))
   (t/testing "try to update non-valid document"
-    (let [body (.getBytes (json/generate-string test-document))
-          response (h/create-document test-ds {:body body})
-          id (:id (response->document response))
-          resp (h/update-document test-ds id
-                                  {:body (.getBytes (json/generate-string test-invalid-document))})]
+    (let [body (.getBytes (json/clj->json test-document))
+          response (h/create-document (merge {:body body} test-identity))
+          id (:id (json/json->clj (:body response)))
+          doc (assoc test-document :metadata "invalid")
+          body2 (.getBytes (json/clj->json doc))
+          resp (h/update-document id (merge {:body body2} test-identity))]
       (t/is (= 400 (:status resp)))
-      (t/is (= "{\"result\":" (subs (:body resp) 0 10))))))
+      (t/is (contains? (json/json->clj (:body resp)) :result)))))

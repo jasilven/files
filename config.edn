@@ -1,0 +1,13 @@
+{:jetty {:join? true
+         :ssl? true
+         :http? false
+         :ssl-port 8080
+         :keystore "keystore.ks"
+         :keystore-type "pkcs12"}
+ :db-spec {:subprotocol "postgresql"
+           :subname "//127.0.0.1:5432/documents"
+           :min-pool-size 3
+           :initial-pool-size 3
+           :max-pool-size 15}
+ :shutdown-secs 5 ; server graceful shutdown time
+ }
