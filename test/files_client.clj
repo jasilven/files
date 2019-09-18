@@ -6,9 +6,8 @@
             [files.token :as token]
             [files.json :as json]))
 
-;; (def api-uri "https://fi007martin.ddc.teliasonera.net:8080/api/files")
 (def uri "https://localhost:8080")
-(def user-token (token/generate {:user "testuser" :origin "testorigin" :secret "123456" :days 1}))
+(def user-token (token/generate {:user "" :origin "" :secret "" :days 1}))
 (def auth-options {:insecure? true :oauth-token user-token})
 (def metadata (json/clj->json {:title "lorem ipsum dolor"
                                :owner "Gene Roddenberry"
@@ -72,7 +71,7 @@
 (defn download-document
   "return document by id"
   [id]
-  (-> (client/get (str uri "/api/files/" id "/download") auth-options) :body))
+  (-> (client/get (str uri "/api/files/" id "/download") (assoc auth-options :as :byte-array)) :body))
 
 (defn update-document
   "update document by id"
@@ -122,7 +121,7 @@
   (-> (post-document jpg-document) (get-document) (dissoc :filedata))
 
   ;; post and download
-  (-> (post-document jpg-document) (download-document) (clojure.java.io/copy (java.io.File. "/tmp/myout.jpg")))
+  (-> (post-document jpg-document) (download-document) (clojure.java.io/copy (java.io.File. "out.jpg")))
 
   ;; post, get and write document to file
   (let [id (post-document pdf-document)]
