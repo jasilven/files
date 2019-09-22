@@ -43,8 +43,8 @@
   "Gracefully shutdown the web server and database/datasource connection pool."
   []
   (try
-    (if (some? @SERVER)
-      (do 
+    (when (some? @SERVER)
+      (do
         (log/info "Server shutdown in progress.")
         (.stop @SERVER)
         (reset! SERVER nil)
@@ -66,7 +66,7 @@
 (def api-routes
   (routes
    (GET "/api/files/:id/download" [id :as request] (h/download request id))
-   (GET "/api/files/:id" [id :as request] (h/get-document request id true))
+   (GET "/api/files/:id" [id binary :as request] (h/get-document request id binary))
    (PUT "/api/files/:id" [id :as request] (h/update-document request id))
    (DELETE "/api/files/:id" [id :as request] (h/close-document request id))
    (GET "/api/files" [limit :as request] (h/get-documents-json request limit))
@@ -74,16 +74,16 @@
 
 (def pub-routes
   (routes
-   (GET "/login" request (io/resource "public/index.html"))
-   (POST "/token" request [] (h/token request (:token-secret @CONFIG)))
+   (POST "/login" request [] (h/login request (:token-secret @CONFIG)))
    (GET "/swagger" [] (io/resource "public/swagger.html"))
-   (GET "/" [] (io/resource "public/swagger.html"))
+   (GET "/docs" [] (io/resource "public/swagger.html"))
+   (GET "/" request (h/index request))
    (route/resources "/")
    #_(route/not-found "Not Found")))
 
 (defn admin?
   [request]
-  (if (true? (get-in request [:identity :admin])) true false))
+  (if (= :admin (get-in request [:identity :role])) true false))
 
 (defn authenticated?
   [request]
@@ -92,24 +92,24 @@
 (defn public [request] true)
 
 (def access-rules [{:pattern #"^/admin/.*" :handler admin?}
+                   {:pattern #"^/admin$" :handler admin?}
                    {:pattern #"^/api/.*$" :handler authenticated?}
                    {:pattern #"^/swagger$" :handler public}
                    {:pattern #"^/swagger.html$" :handler public}
                    {:pattern #"^/swagger.yaml$" :handler public}
                    {:pattern #"^/css/.*$" :handler public}
                    {:pattern #"^/js/.*$" :handler public}
-                   {:pattern #"^/token$" :handler public}
                    {:pattern #"^/login$" :handler public}
-                   {:pattern #"^/.*" :handler authenticated?}])
+                   {:pattern #"^/$" :handler public}])
 
 (def access-denied {:status  200 :headers {} :body "Access Denied!"})
 
 (defn auth-error [request exp]
-  (log/warn exp "Authentication failed:" (dissoc request :headers))
+  (log/warn "Authentication failed:" (dissoc request :headers))
   access-denied)
 
 (defn access-error [request exp]
-  (log/warn exp "Unauthorized access attempt:" (dissoc request :headers))
+  (log/warn "Unauthorized access attempt:" (dissoc request :headers))
   access-denied)
 
 (defn configurator
@@ -123,7 +123,7 @@
 
 (defn run-server
   []
-  (-> (routes pub-routes api-routes admin-routes)
+  (-> (routes pub-routes api-routes admin-routes (route/not-found "Not found"))
       wrap-params
       wrap-multipart-params
       (wrap-access-rules {:rules access-rules
@@ -153,7 +153,9 @@
      (catch Exception e (error-exit e)))))
 
 (comment
-  (start {:path "config_test.edn" :keypass "123456" :token-secret "123456"})
+  (if (nil? @SERVER)
+    (start {:path "config_test.edn" :keypass "123456" :token-secret "123456"})
+    "Stop the server first")
   (stop)
   ;;
   )

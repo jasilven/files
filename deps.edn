@@ -1,8 +1,9 @@
-{:paths ["src" "resources"]
+{:paths ["src" "resources" "test"]
  :aliases {:test {:extra-paths ["test"]}
            :dev {:extra-paths ["test"]}}
  :deps
- {cli-matic {:mvn/version "0.3.8"}
+ {
+  cli-matic {:mvn/version "0.3.8"}
   buddy/buddy-hashers {:mvn/version "1.4.0"}
   buddy/buddy-auth {:mvn/version"2.2.0"}
   buddy/buddy-sign {:mvn/version "3.1.0"}

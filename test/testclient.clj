@@ -7,7 +7,7 @@
             [files.json :as json]))
 
 (def uri "https://localhost:8080")
-(def user-token (token/generate {:user "" :origin "" :secret "" :days 1}))
+(def user-token (token/generate {:user "testclient" :origin "testorigin" :secret "" :days 1}))
 (def auth-options {:insecure? true :oauth-token user-token})
 (def metadata (json/clj->json {:title "lorem ipsum dolor"
                                :owner "Gene Roddenberry"
@@ -63,10 +63,13 @@
 
 (defn get-document
   "return document by id"
-  [id]
-  (-> (client/get (str uri "/api/files/" id) auth-options)
-      :body
-      (json/json->clj)))
+  [id binary?]
+  (let [uri (str uri "/api/files/" id "?binary=" binary?)
+        uri (str uri "/api/files/" id)]
+    (println "URI:" uri)
+    (-> (client/get uri auth-options)
+        :body
+        (json/json->clj))))
 
 (defn download-document
   "return document by id"
@@ -85,18 +88,21 @@
 (defn write-document
   "write document to file"
   [id path]
-  (-> (get-document id)
+  (-> (get-document id "yes")
       :filedata
       (b64/decode)
       (clojure.java.io/copy (java.io.File. path))))
 
 (defn generate-documents
   "post document from documents vector randomly n times"
-  [documents n]
+  [cnt]
   (try
-    (let [doc-cnt (count documents)]
-      (dotimes [_ n]
-        (post-document (get documents (rand-int doc-cnt)))))
+    (dotimes [n cnt]
+      (let [jpg-doc (json/clj->json {:filename (str "longfilename-doc-" n "-testfile.jpg")
+                                     :mimetype "image/jpg"
+                                     :filedata (b64/encode-file "test/testfile.jpg")
+                                     :metadata metadata})]
+        (post-document jpg-doc)))
     (catch Exception e (println (.getMessage e) (ex-data e)))))
 
 (defn update-documents
@@ -118,7 +124,7 @@
   (into [] (get-documents))
 
   ;; post and get
-  (-> (post-document jpg-document) (get-document) (dissoc :filedata))
+  (-> (post-document jpg-document) (get-document "") keys)
 
   ;; post and download
   (-> (post-document jpg-document) (download-document) (clojure.java.io/copy (java.io.File. "out.jpg")))
@@ -126,19 +132,16 @@
   ;; post, get and write document to file
   (let [id (post-document pdf-document)]
     (update-document id jpg-document)
-    (get-document id)
+    (get-document id "yes")
     (write-document id "out.jpg"))
 
   ;; generate n documents
-  (time (generate-documents [pdf-document jpg-document] 10))
+  (generate-documents 1)
 
   ;; randomly update all documents
   (update-documents [pdf-document jpg-document])
 
   ;; auth test
-  (client/get (str uri "/api/files") (merge auth-options {:content-type :json :throw-exceptions false}))
-
-  (client/get (str uri "/admin") (merge auth-options {:content-type :json :throw-exceptions false}))
 
   ;; This should return 400 and error response!
   ;; try to post document with invalid metadata json

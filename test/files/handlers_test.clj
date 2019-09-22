@@ -76,22 +76,38 @@
     (let [body (.getBytes (json/clj->json test-document))
           create-resp (h/create-document (merge {:body body} test-identity))
           id (:id (json/json->clj (:body create-resp)))
-          get-resp (h/get-document test-identity id true)
-          get-nonexist (h/get-document test-identity (db/uuid) true)
-          get-invalid (h/get-document test-identity "invalid-id" true)]
+          get-resp-binary (h/get-document test-identity id)
+          get-resp-nobinary (h/get-document test-identity id "no")
+          get-nonexist (h/get-document test-identity (db/uuid))
+          get-invalid (h/get-document test-identity "invalid-id")]
       (t/is (= 200 (:status create-resp)))
-      (t/is (= 200 (:status get-resp)))
-      (t/is (= 400 (:status get-nonexist)))
-      (t/is (= 400 (:status get-invalid)))
+      (t/is (= 200 (:status get-resp-binary)))
+      (t/is (= 200 (:status get-resp-nobinary)))
+      (t/is (= 404 (:status get-nonexist)))
+      (t/is (= 404 (:status get-invalid)))
       (t/is (contains? (json/json->clj (:body get-nonexist)) :result))
       (t/is (contains? (json/json->clj (:body get-invalid)) :result)))))
+
+(t/deftest download-document
+  (t/testing "create and then download document as file"
+    (let [body (.getBytes (json/clj->json test-document))
+          create-resp (h/create-document (merge {:body body} test-identity))
+          id (:id (json/json->clj (:body create-resp)))
+          download-resp (h/download (merge {:body body} test-identity) id)
+          get-nonexist (h/download test-identity (db/uuid))
+          get-invalid (h/download test-identity "invalid-id")]
+      (t/is (= 200 (:status create-resp)))
+      (t/is (= 200 (:status download-resp)))
+      (t/is (some? (:body download-resp)))
+      (t/is (= 404 (:status get-nonexist)))
+      (t/is (= 404 (:status get-invalid))))))
 
 (t/deftest get-document-schema
   (t/testing "create/get and check returned document schema"
     (let [body (.getBytes (json/clj->json test-document))
           create-resp (h/create-document (merge {:body body} test-identity))
           id (:id (json/json->clj (:body create-resp)))
-          get-resp (h/get-document test-identity id true)
+          get-resp (h/get-document test-identity id "no")
           document (json/json->clj (:body get-resp))]
       (t/is (= 200 (:status get-resp)))
       (t/is (contains? document :id))
@@ -122,7 +138,7 @@
     (let [body (.getBytes (json/clj->json test-document))
           create-resp (h/create-document (merge {:body body} test-identity))
           id (:id (json/json->clj (:body create-resp)))
-          get-resp (h/get-document test-identity id false )
+          get-resp (h/get-document test-identity id "no")
           document (json/json->clj (:body get-resp))]
       (t/is (= 200 (:status create-resp)))
       (t/is (= 200 (:status get-resp)))
@@ -150,10 +166,11 @@
     (let [body1 (.getBytes (json/clj->json test-document))
           response1 (h/create-document (merge {:body body1} test-identity))
           id1 (:id (json/json->clj (:body response1)))
-          original (json/json->clj (:body (h/get-document test-identity id1 true )))
+          original (json/json->clj (:body (h/get-document test-identity id1)))
           body2 (.getBytes (json/clj->json test-document2))
           response2 (h/update-document (merge {:body body2} test-identity) id1)
-          updated (json/json->clj (:body (h/get-document test-identity (:id original) true)))]
+          updated (json/json->clj (:body (h/get-document test-identity (:id original))))
+          _ (println (keys updated))]
       (t/is (contains? (json/json->clj (:body response1)) :id))
       (t/is (= {:result "success"} (json/json->clj (:body response2))))
       (t/is (= 200 (:status response1)))
@@ -164,7 +181,7 @@
       (t/is (not= (:updated original) (:updated updated)))
       (t/is (not= (:mimetype original) (:mimetype updated)))
       (t/is (not= (:filename original) (:filename updated)))
-      (t/is (not= (count (:filedata original)) (count (:filedata updated))))))
+      #_(t/is (not= (.length (:filedata original)) (.length (:filedata updated))))))
   (t/testing "try to update non-existing document"
     (let [body (.getBytes (json/clj->json test-document))
           resp (h/update-document (merge {:body body} test-identity) "non-existing-id" )]

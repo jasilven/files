@@ -7,6 +7,7 @@
             [clojure.tools.logging :as log]
             [files.token :as token]
             [hiccup.core :refer [html]]
+            ;; [hiccup.page :refer [html5]]
             [files.db :as db]))
 
 ;; keys that must be included in document when creating/updating
@@ -22,14 +23,17 @@
   [status & elements]
   {:status status
    :body (html elements)
-   :headers {"Content-Type" "text/html;charset=utf-8"}})
+   :headers {"Content-type" "text/html;charset=utf-8"}})
+
+(defn error-key-msg [key]
+  (str " [error-key: " key "] "))
 
 (defn html-error
   "Return error response as html and write msg to log."
   [code exp msg]
   (let [error-key (format "%x" (.hashCode (java.time.Instant/now)))]
     (log/error exp msg (assoc (ex-data exp) :error-key error-key))
-    (html-response code (str msg ", error-key: " error-key))))
+    (html-response code (str msg (error-key-msg error-key)))))
 
 (defn json-response
   "Return json response as response map."
@@ -41,11 +45,29 @@
 (def json-ok (partial json-response 200))
 
 (defn json-error
-  "Return error response as json and write msg to log."
+  "Return error response as json and write Error msg to log."
   [code exp msg]
   (let [error-key (format "%x" (.hashCode (java.time.Instant/now)))]
     (log/error exp msg (assoc (ex-data exp) :error-key error-key))
-    (json-response code {:result (str msg ", error-key: " error-key)})))
+    (json-response code {:result (str msg (error-key-msg error-key))})))
+
+(defn json-warn
+  "Return error response as json and write Warn msg to log."
+  [code exp msg]
+  (let [error-key (format "%x" (.hashCode (java.time.Instant/now)))]
+    (log/warn (str msg " " (.getMessage exp) (error-key-msg error-key)))
+    (json-response code {:result (str msg (error-key-msg error-key))})))
+
+(defn index
+  "Main entry point which starts the adminapp."
+  [request]
+  (html [:html
+         [:head
+          [:meta {:charset "UTF-8"}]
+          [:title "Files API"]
+          [:link {:rel "stylesheet" :href "/css/bootstrap.min.css"}]]
+         [:body
+          [:div#app] [:script {:src "/js/main.js" :type "text/javascript" }]]]))
 
 (defn get-documents
   "Return documents as vector. Throws if error."
@@ -63,14 +85,18 @@
     (catch Exception e (json-error 400 e "failed to get documents"))))
 
 (defn get-document
-  "Return document as json response, file data is included if binary? is true."
-  [request id binary?]
-  (try
-    (let [result (db/get-document id binary? (:identity request))]
-      (if (nil? result)
-        (throw (ex-info "document not found" {:id id}))
-        (json-response 200 result)))
-    (catch Exception e (json-error 400 e "failed to get document"))))
+  "Return document as json response, file data is dropped if binary? is 'false' or 'no'."
+  ([request id]
+   (get-document request id nil))
+  ([request id binary?]
+   (try
+     (let [binary? (if (or (= "false" binary?)
+                           (= "no" binary?)) false true)
+           result (db/get-document id binary? (:identity request))]
+       (if (nil? result)
+         (json-response 404 {:result (str "Document not found, id: " id)})
+         (json-response 200 result)))
+     (catch Exception e (json-error 400 e "failed to get document")))))
 
 (defn valid-json?
   "Returns true if input is valid json, false otherwise."
@@ -111,7 +137,7 @@
   (try
     (if (db/close-document id (:identity request))
       (json-ok {:result "success"})
-      (throw (ex-info "close failed, maybe already closed" {:id id})))
+      (throw (ex-info "close failed, maybe already closed or not found" {:id id})))
     (catch Exception e (json-error 400 e "document close failed"))))
 
 (defn update-document
@@ -125,14 +151,17 @@
         (throw (ex-info "update failed, maybe non-existing document" {:id id}))))
     (catch Exception e (json-error 400 e (str "document update failed: " (.getMessage e))))))
 
-(defn token
-  "Validates token and returns claims with response code 200 if token is valid else returns response code 401."
+(defn login
+  "Admin login: validates admin token and returns claims with response code 200 if token is valid admin token
+  else returns response code 401."
   [request secret]
   (try
     (let [data (json/json->clj (slurp (:body request)))
           claims (token/validate (:token data) secret)]
-      (json-ok claims))
-    (catch Exception e (json-error 401 e (str "Invalid token: " token)))))
+      (if (= "admin" (:role claims))
+        (json-ok claims)
+        (json-response 401 {:result "Token is not a valid admin token!"})))
+    (catch Exception e (json-warn 401 e "Invalid token!"))))
 
 (defn download
   "Return file response with file's mime type set to content-type."

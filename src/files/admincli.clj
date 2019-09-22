@@ -2,20 +2,7 @@
   (:gen-class)
   (:import [java.time Instant])
   (:require [cli-matic.core :refer [run-cmd]]
-            [clj-http.client :as client]
             [files.token :as token]))
-
-(def uri "https://localhost:8080")
-
-(defn shutdown
-  "Shutdown the server!"
-  [{:keys [secret]}]
-  (try
-    (let [token (token/generate {:user "admincli" :origin "commandline" :days 1 :secret secret :admin true})
-          auth-options {:insecure? true :oauth-token token}]
-      (client/get (str uri "/admin/shutdown") auth-options)
-      (println "Server shutting down."))
-    (catch Exception e (println "Error:" (.getMessage e)))))
 
 (defn generate-token
   "Generates and prints out token."
@@ -39,14 +26,10 @@
     (println "Expires:" (str (Instant/ofEpochSecond (:exp claims))))))
 
 (def CONFIG
-  {:app {:command "admtool"
-         :description "Admin tool for files API"
+  {:app {:command "admcli"
+         :description "Command line tool for files API"
          :version "0.1"}
-   :commands [{:command "shutdown"
-               :description "Validates and prints claims inside JWT token"
-               :opts [{:option "secret" :short "s" :as "Secret used for token" :type :string :default :present}]
-               :runs shutdown}
-              {:command "validate"
+   :commands [{:command "validate"
                :description "Validates and prints claims inside JWT token"
                :opts [{:option "token" :short "t" :as "JWT token" :type :string :default :present}
                       {:option "secret" :short "s" :as "Secret used for unsigning the token" :type :string :default :present}]

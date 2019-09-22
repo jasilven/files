@@ -18,5 +18,5 @@
   [{:keys [user origin secret days admin] :or {days 1 admin false origin "unknown"}}]
   (let [expires (.plusSeconds (Instant/now) (* days 24 60 60))]
     (if admin
-      (jwt/sign {:admin true :user user :origin origin :exp expires} secret sign-opts)
-      (jwt/sign {:user user :origin origin :exp expires} secret sign-opts))))
+      (jwt/sign {:role "admin" :user user :origin origin :exp expires} secret sign-opts)
+      (jwt/sign {:role "non-admin" :user user :origin origin :exp expires} secret sign-opts))))

@@ -1,11 +1,13 @@
 {:source-paths ["src"]
- ;; :dependencies [[reagent "0.8.1" :exclusions [cljsjs/react cljsjs/react-dom]]]
  :dependencies [[reagent "0.9.0-rc1"]
-                [cljs-http "0.1.46"]]
+                [cljs-http "0.1.46"];; not used in re-frame
+                [cljs-ajax "0.8.0"]
+                [day8.re-frame/http-fx "0.1.6"]
+                [re-frame "0.11.0-rc1"]]
  :builds {:app {:target :browser
                 :output-dir "resources/public/js"
                 :asset-path "/js"
-                :modules {:main {:init-fn files.adminapp/main!}}
-                :devtools {:after-load files.adminapp/reload!
+                :modules {:main {:init-fn adminapp.core/main}}
+                :devtools {:after-load adminapp.core/reload
                            :http-root "resources/public"
                            :http-port 8888}}}}
