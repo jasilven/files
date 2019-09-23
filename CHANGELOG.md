@@ -1,5 +1,10 @@
 # Changes
 
+## 0.3.1
+- logging changed to timbre
+- search bar fix
+- code base cleaning
+
 ## 0.3
 - adminui implementation from reagent to re-frame
 - adminui new features: paging, find by id

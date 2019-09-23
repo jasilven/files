@@ -45,39 +45,38 @@
   [:div.text-center.spinner-border.spinner-border-sm {:role "status"}
    [:span.sr-only "loading.."]])
 
-(defn top-navi []
+(defn search-panel []
   (let [id (reagent/atom "")]
     (fn []
-      (let [refreshing? @(rf/subscribe [:refreshing?])
-            backend @(rf/subscribe [:backend])
-            identity @(rf/subscribe [:identity])
-            page @(rf/subscribe [:active-page])]
-        [:nav.navbar {:style {:background-color "#990AE3"}}
-         [:ul.nav
-          [:li.nav-item>a.nav-link.font-weight-bold {:style {:color "#ffffff"}} "Files"]
-          [:li.nav-item>a.nav-link.text-bolder {:style {:color "#eeeeee"} :href "/swagger" :target "_blank"} "Docs"]
-          [:li.nav-item>a.nav-link.text-white-50.font-italic backend]
-          (when identity
-            [:li.nav-item>div.input-group.input-group-sm
-             [:div.input-group-prepend>span.input-group-text>div.small "ID"]
-             [:input.form-control {:type "text"
-                                   :value @id
-                                   :on-change #(reset! id (-> % .-target .-value))}]
-             [:button.btn.btn-light.ml-2.btn-sm {:style {:color "#444444"}
-                                                 :on-click (fn []
-                                                             (rf/dispatch [:fetch-document @id])
-                                                             (reset! id ""))} "Find"]])]
-         (when identity
-           [:ul.nav.justify-content-end
-            (when (= page :document-list)
-              (if refreshing?
-                [:li.nav-item>a.nav-link {:style {:color "#ffffff"}} [spinner]]
-                [:li.nav-item>a.nav-link {:style {:color "#eeeeee"}
-                                          :on-click #(rf/dispatch [:refresh-documents])} "refresh"]))
-            [:li.nav-item>a.nav-link.font-weight-bolder
-             {:style {:color "#eeeeee"}} (str "🎗") [:span.font-italic.ml-1 (:user identity)]]
-            [:li.nav-item>a.nav-link.font-weight-bolder
-             {:style {:color "#4A0C6A"} :on-click #(rf/dispatch [:logout])} "Logout"]])]))))
+      [:li.nav-item>div.input-group.input-group-sm
+       [:input.form-control.mt-1 {:type "text" :placeholder "<Document ID>"
+                                  :value @id :on-change #(reset! id (-> % .-target .-value))}]
+       [:button.btn.btn-light.ml-1.mt-1.btn-sm {:style {:color "#444444"}
+                                                :on-click #(do (rf/dispatch [:fetch-document @id])
+                                                               (reset! id ""))} "Find"]])))
+
+(defn top-navi []
+  (let [refreshing? @(rf/subscribe [:refreshing?])
+        backend @(rf/subscribe [:backend])
+        identity @(rf/subscribe [:identity])
+        page @(rf/subscribe [:active-page])]
+    [:nav.navbar {:style {:background-color "#990AE3"}}
+     [:ul.nav
+      [:li.nav-item>a.nav-link.font-weight-bold {:style {:color "#ffffff"}} "Files"]
+      [:li.nav-item>a.nav-link.text-bolder {:style {:color "#eeeeee"} :href (str backend "/swagger") :target "_blank"} "Info"]
+      [:li.nav-item>a.nav-link.text-white-50.font-italic backend]
+      (when identity [search-panel])]
+     (when identity
+       [:ul.nav.justify-content-end
+        (when (= page :document-list)
+          (if refreshing?
+            [:li.nav-item>a.nav-link {:style {:color "#ffffff"}} [spinner]]
+            [:li.nav-item>a.nav-link {:style {:color "#eeeeee"}
+                                      :on-click #(rf/dispatch [:refresh-documents])} "Refresh"]))
+        [:li.nav-item>a.nav-link.font-weight-bolder
+         {:style {:color "#eeeeee"}} (str "🎗") [:span.font-italic.ml-1 (:user identity)]]
+        [:li.nav-item>a.nav-link.font-weight-bolder
+         {:style {:color "#4A0C6A"} :on-click #(rf/dispatch [:logout])} "Quit"]])]))
 
 (defn login-page []
   (let [token (reagent/atom "")]
@@ -186,10 +185,9 @@
                (doall
                 (for [key keys]
                   ^{:key key} [:th {:scope "col"} (str/capitalize (name key))]))]
-              [:tbody (document-list page page-size keys)]]
-             (pagination page page-size)])
+              [:tbody (document-list page page-size keys)]]])
           (when-not refreshing? [:div.text-center.h5.mt-3 "No documents found"]))))))
 
-(defn show-alert [msg]
+(defn alert-panel [msg]
   [:div.alert.alert-warning.w-50.mt-2.mx-auto
    {:role "alert" :on-click #(rf/dispatch [:clear-alert])} msg])

@@ -3,21 +3,23 @@
            :dev {:extra-paths ["test"]}}
  :deps
  {
-  cli-matic {:mvn/version "0.3.8"}
-  buddy/buddy-hashers {:mvn/version "1.4.0"}
   buddy/buddy-auth {:mvn/version"2.2.0"}
+  buddy/buddy-hashers {:mvn/version "1.4.0"}
   buddy/buddy-sign {:mvn/version "3.1.0"}
-  clj-http {:mvn/version "3.10.0"}
+  ;; ch.qos.logback/logback-classic {:mvn/version "1.2.3"}
   cheshire {:mvn/version "5.8.1"}
-  org.clojure/clojure {:mvn/version "1.10.0"}
-  ch.qos.logback/logback-classic {:mvn/version "1.2.3"}
-  org.clojure/tools.logging {:mvn/version "0.4.1"}
-  compojure {:mvn/version "1.6.1"}
-  seancorfield/next.jdbc {:mvn/version "1.0.1"}
+  cli-matic {:mvn/version "0.3.8"}
+  clj-http {:mvn/version "3.10.0"}
   clojure.jdbc/clojure.jdbc-c3p0 {:mvn/version "0.3.3"}
-  org.postgresql/postgresql {:mvn/version "42.2.5"}
-  ring-cors {:mvn/version "0.1.13"}
-  ring {:mvn/version "1.7.0"}
-  org.clojure/java.jdbc {:mvn/version "0.7.9"}
+  com.fzakaria/slf4j-timbre  {:mvn/version "0.3.14"}
+  compojure {:mvn/version "1.6.1"}
   hiccup {:mvn/version "1.0.5"}
-  ring-basic-authentication {:mvn/version "1.0.5"}}}
+  org.clojure/clojure {:mvn/version "1.10.0"}
+  org.clojure/java.jdbc {:mvn/version "0.7.9"}
+  org.clojure/tools.logging {:mvn/version "0.4.1"}
+  org.postgresql/postgresql {:mvn/version "42.2.5"}
+  ring {:mvn/version "1.7.0"}
+  ring-basic-authentication {:mvn/version "1.0.5"}
+  ring-cors {:mvn/version "0.1.13"}
+  seancorfield/next.jdbc {:mvn/version "1.0.1"}
+  }}

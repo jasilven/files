@@ -84,7 +84,7 @@
 (rf/reg-event-db
  :fetch-document-failure
  (fn [db [_ response]]
-   (assoc db :alert (or (get-in response [:response :result]) "Failed to find document!"))))
+   (assoc db :alert (or (get-in response [:response :result]) "Document not found!"))))
 
 (rf/reg-event-fx
  :refresh-documents
@@ -150,7 +150,7 @@
         alert @(rf/subscribe [:alert])]
     [:div
      [v/top-navi]
-     (when alert [v/show-alert alert])
+     (when alert [v/alert-panel alert])
      [page active-page]]))
 
 (defn main []
@@ -161,10 +161,7 @@
     (reagent/render [app] (js/document.getElementById "app"))))
 
 (defn reload []
-  ;; (rf/dispatch-sync [:initialize "https://localhost:8080"])
-  ;; (rf/dispatch [:set-backend "https://localhost:8080"])
-  ;; (rf/dispatch [:refresh-documents])
-  ;; (rf/dispatch [:set-active-page :document-list])
+  (rf/dispatch-sync [:set-backend "https://localhost:8080"])
   (reagent/render [app] (js/document.getElementById "app")))
 
 ;; (require '[re-frame.core :as rf])

@@ -12,7 +12,9 @@
             [ring.middleware.cors :refer [wrap-cors]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [taoensso.timbre :as timbre]
+            )
   (:import org.eclipse.jetty.server.handler.StatisticsHandler))
 
 (defonce ^:private CONFIG (atom nil))
@@ -142,6 +144,9 @@
   ([config]
    (try
      (reset-config! config)
+     (timbre/merge-config! (merge {:output-fn (partial timbre/default-output-fn {:stacktrace-fonts {}})}
+                                  (:timbre @CONFIG)))
+
      (db/setup-datasource (:db-spec @CONFIG))
      (when-not (db/db-connection?)
        (throw (.Exception "No DB connection. Check DB and/or DB configuration.")))
