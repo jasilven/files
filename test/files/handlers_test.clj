@@ -2,15 +2,17 @@
   (:require [clojure.test :as t]
             [files.json :as json]
             [files.db :as db]
+            [taoensso.timbre :as timbre]
             [files.test-data :refer :all]
             [files.handlers :as h]))
 
 (defn test-fixture-each [f]
-  (db/setup-datasource test-db-spec)
-  (db/create-files-table)
-  (f)
-  (db/drop-files-table)
-  (db/drop-datasource))
+  (timbre/with-level (:level test-timbre)
+    (db/setup-datasource test-db-spec)
+    (db/create-files-table)
+    (f)
+    (db/drop-files-table)
+    (db/drop-datasource)))
 
 (t/use-fixtures :each test-fixture-each)
 
@@ -169,8 +171,7 @@
           original (json/json->clj (:body (h/get-document test-identity id1)))
           body2 (.getBytes (json/clj->json test-document2))
           response2 (h/update-document (merge {:body body2} test-identity) id1)
-          updated (json/json->clj (:body (h/get-document test-identity (:id original))))
-          _ (println (keys updated))]
+          updated (json/json->clj (:body (h/get-document test-identity (:id original))))]
       (t/is (contains? (json/json->clj (:body response1)) :id))
       (t/is (= {:result "success"} (json/json->clj (:body response2))))
       (t/is (= 200 (:status response1)))

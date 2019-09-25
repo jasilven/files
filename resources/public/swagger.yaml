@@ -4,7 +4,7 @@ info:
   description: Generic REST-API for storing and requesting all kinds of documents
                and their metadata. Authentication is based on Bearer-token,
                which you must request in advance.
-  version: 0.3.0
+  version: 0.3.2
   title: Files API
   contact:
     email: jari
@@ -37,17 +37,17 @@ components:
           readOnly: true
           type: string
           format: date-time 
-          example: '2020-11-04T09:41:27.412Z'
+          example: '2020-11-04T09:41:27Z'
         updated:
           readOnly: true
           type: string
           format: date-time 
-          example: '2020-12-05T09:41:27.412Z'
+          example: '2020-12-05T09:41:27Z'
         closed:
           readOnly: true
           type: string
           format: date-time 
-          example: '2020-12-05T09:41:27.412Z'
+          example: '2020-12-05T09:41:27Z'
         filename:
           type: string
           example: document.pdf

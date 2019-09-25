@@ -159,7 +159,7 @@
 
 (comment
   (if (nil? @SERVER)
-    (start {:path "config_test.edn" :keypass "123456" :token-secret "123456"})
+    (start {:path "config_dev.edn" :keypass "123456" :token-secret "123456"})
     "Stop the server first")
   (stop)
   ;;

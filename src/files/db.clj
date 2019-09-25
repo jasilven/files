@@ -45,7 +45,7 @@
       (.setValue (json/clj->json m)))
     pgo))
 
-;; Conversions from postgres JSON data type to EDN and java.sql.Timestamp to Instant
+;; Conversions from postgres JSON data type to EDN
 (extend-protocol rs/ReadableColumn
   PGobject
   (read-column-by-label ^clojure.lang.IPersistentMap [^PGobject pgo _]
@@ -59,12 +59,7 @@
           value (.getValue pgo)]
       (case type
         "json" (json/json->clj value)
-        :else value)))
-  java.sql.Timestamp
-  (read-column-by-label ^java.time.Instant [^java.sql.Timestamp v _]
-    (.toInstant v))
-  (read-column-by-index ^java.time.Instant [^java.sql.Timestamp v _2 _3]
-    (.toInstant v)))
+        :else value))))
 
 (defn uuid
   "Return new UUID as string or convert s to UUID. Throws if error."

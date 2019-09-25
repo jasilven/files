@@ -10,5 +10,5 @@
            :initial-pool-size 3
            :max-pool-size 15}
  :shutdown-secs 5 ; server graceful shutdown time
- :timbre {:level :fatal} ; #{:trace :debug :info :warn :error :fatal :report}
+ :timbre {:level :info} ; #{:trace :debug :info :warn :error :fatal :report}
  }

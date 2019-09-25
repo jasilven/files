@@ -1,14 +1,16 @@
 (ns files.db-test
   (:require [files.db :as db]
             [files.test-data :refer :all]
+            [taoensso.timbre :as timbre]
             [clojure.test :as t]))
 
 (defn test-fixture-each [f]
-  (db/setup-datasource test-db-spec)
-  (db/create-files-table)
-  (f)
-  (db/drop-files-table)
-  (db/drop-datasource))
+  (timbre/with-level (:level test-timbre)
+    (db/setup-datasource test-db-spec)
+    (db/create-files-table)
+    (f)
+    (db/drop-files-table)
+    (db/drop-datasource)))
 
 (t/use-fixtures :each test-fixture-each)
 
