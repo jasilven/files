@@ -1,5 +1,8 @@
 # Changes
 
+## 0.3.2
+- API time format change to yyyy-MM-dd'T'HH:mm:ss'Z'
+
 ## 0.3.1
 - logging changed to timbre
 - search bar fix
