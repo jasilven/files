@@ -69,6 +69,16 @@
          [:body
           [:div#app] [:script {:src "/js/main.js" :type "text/javascript" }]]]))
 
+(defn get-auditlogs
+  "Return auditlogs as json. Throws if error."
+  [request fileid limit]
+  (let [limit (if (pos-int? limit) limit
+                  (try (Integer/parseInt limit)
+                       (catch Exception e db/DEFAULT-QUERY-LIMIT)))]
+    (try 
+      (json-ok (into [] (db/get-auditlogs fileid limit)))
+      (catch Exception e (json-error 400 e "failed to get auditlogs")))))
+
 (defn get-documents
   "Return documents as vector. Throws if error."
   [request limit]

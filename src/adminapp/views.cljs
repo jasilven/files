@@ -94,12 +94,23 @@
 
 (defn json-panel [json]
   [:div.card-body
+   [:h4 "Json"]
    [:pre.pre-scrollable @json]
    [:button.btn.btn-sm.btn-dark.ml-0
     {:type "button"
      :on-click #(send-to-browser @json "data.json" "application/json")} "Open"]
    [:button.btn.btn-sm.btn-outline-dark.ml-2
     {:type "button" :on-click #(reset! json nil)} "✖ Close"]])
+
+(defn logs-panel [logs]
+  [:div.card-body
+   [:h4 "Logs"]
+   [:pre.pre-scrollable
+    (doall
+     (for [log logs]
+       (str (:created log) "," (:event log) "," (:userid log) "," (:origin log) "\n")))]
+   [:button.btn.btn-sm.btn-outline-dark.ml-2
+    {:type "button" :on-click #(rf/dispatch [:clear-logs])} "✖ Close"]])
 
 (defn metadata-panel [metadata]
   [:div.card-body
@@ -113,7 +124,8 @@
 (defn document-details-page []
   (let [json (reagent/atom nil)]
     (fn []
-      (let [document @(rf/subscribe [:selected-document])]
+      (let [document @(rf/subscribe [:selected-document])
+            logs @(rf/subscribe [:selected-document-logs])]
         [:div.card.mx-auto.my-3 {:style {:width "47rem"}}
          [:div.card-header
           [:button.btn.btn-sm.btn-outline-dark.ml-2
@@ -130,13 +142,22 @@
                (if (= key "Filename:")
                  [:td.btn-link.button {:type "button" :on-click #(download document)} val]
                  [:td val])]))]
-          (when-not @json
-            [:div.mt-3.button.btn.btn-sm.btn-dark.ml-2
-             {:type "button"
-              :on-click #(reset! json (clj->json document true))} "json"])]
-         (if @json
-           [json-panel json]
-           [metadata-panel (:metadata document)])]))))
+          (cond
+            (and (nil? @json) (nil? logs))
+            [:div
+             [:div.mt-3.button.btn.btn-sm.btn-dark.ml-2
+              {:type "button"
+               :on-click #(reset! json (clj->json document true))} "Json"]
+             [:div.mt-3.button.btn.btn-sm.btn-dark.ml-2
+              {:type "button"
+               :on-click #(rf/dispatch [:fetch-logs (:id document)])} "Logs"]
+             [metadata-panel (:metadata document)]]
+
+            @json
+            [json-panel json]
+
+            logs
+            [logs-panel logs])]]))))
 
 (defn document-list [page page-size keys]
   (let [documents @(rf/subscribe [:documents])

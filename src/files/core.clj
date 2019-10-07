@@ -59,11 +59,7 @@
 
 (def admin-routes
   (routes
-   #_(POST "/admin/upload" request (admin/upload request))
-   #_(GET "/admin/close/:id" [id :as request] (admin/close id))
-   #_(GET "/admin/open/:id" [id :as request] (admin/open id))
-   #_(GET "/admin/download/:id" [id :as request] (admin/download id))
-   #_(GET "/admin/details/:id" [id :as request] (admin/details id))))
+   (GET "/admin/auditlogs/:id" [id limit :as request] (h/get-auditlogs request id limit))))
 
 (def api-routes
   (routes
@@ -80,12 +76,12 @@
    (GET "/swagger" [] (io/resource "public/swagger.html"))
    (GET "/docs" [] (io/resource "public/swagger.html"))
    (GET "/" request (h/index request))
-   (route/resources "/")
-   #_(route/not-found "Not Found")))
+   (route/resources "/")))
 
 (defn admin?
   [request]
-  (if (= :admin (get-in request [:identity :role])) true false))
+  (println "admin?" (get-in request [:identity :role]))
+  (if (= "admin" (get-in request [:identity :role])) true false))
 
 (defn authenticated?
   [request]

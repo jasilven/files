@@ -7,6 +7,7 @@
 
 (def default-db {:active-page :login
                  :selected-document nil
+                 :selected-document-logs nil
                  :documents nil
                  :refreshing? false
                  :alert nil
@@ -87,6 +88,34 @@
    (assoc db :alert (or (get-in response [:response :result]) "Document not found!"))))
 
 (rf/reg-event-fx
+ :fetch-logs
+ (fn [{db :db} [_ id]]
+   (let [backend @(rf/subscribe [:backend])]
+     {:http-xhrio {:method :get :uri (str backend "/admin/auditlogs/" id)
+                   :headers (auth-header (:token db))
+                   :format (ajax/json-request-format)
+                   :response-format (ajax/json-response-format {:keywords? true})
+                   :on-success [:fetch-logs-success]
+                   :on-failure [:fetch-logs-failure]}
+      :db db})))
+
+(rf/reg-event-db
+ :clear-logs
+ (fn [db [_ _]]
+   (assoc db :selected-document-logs nil)))
+
+(rf/reg-event-db
+ :fetch-logs-success
+ (fn [db [_ response]]
+   (let [logs (v/json->clj response)]
+     (assoc db :selected-document-logs logs))))
+
+(rf/reg-event-db
+ :fetch-logs-failure
+ (fn [db [_ response]]
+   (assoc db :alert (or (get-in response [:response :result]) "Logs not found!"))))
+
+(rf/reg-event-fx
  :refresh-documents
  (fn [{db :db} [_ _]]
    (let [backend @(rf/subscribe [:backend])]
@@ -116,7 +145,10 @@
 (rf/reg-event-db
  :close-details
  (fn [db [_ _]]
-   (assoc db :selected-document nil :active-page :document-list)))
+   (assoc db
+          :selected-document nil
+          :selected-document-logs nil
+          :active-page :document-list)))
 
 (rf/reg-event-db
  :alert
@@ -131,6 +163,7 @@
 ;; SUBS
 (rf/reg-sub :active-page (fn [db _] (:active-page db)))
 (rf/reg-sub :selected-document (fn [db _] (:selected-document db)))
+(rf/reg-sub :selected-document-logs (fn [db _] (:selected-document-logs db)))
 (rf/reg-sub :documents (fn [db _] (:documents db)))
 (rf/reg-sub :alert (fn [db _] (:alert db)))
 (rf/reg-sub :identity (fn [db _] (:identity db)))

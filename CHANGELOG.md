@@ -1,5 +1,8 @@
 # Changes
 
+## 0.3.3
+- auditlog view added to the ui
+
 ## 0.3.2
 - API time format change to yyyy-MM-dd'T'HH:mm:ss'Z'
 
